@@ -3,10 +3,10 @@ import {authService} from './lib/auth.mjs';
 export default {
  async fetch(req,env){
   try{
-   const url=new URL(req.url),auth=authService(env.DB);
-   const response=await auth.handle(req);if(response)return response;
-   if(url.pathname.startsWith('/api/')||url.pathname.startsWith('/media/'))return createStoreHandler({db:env.DB,bucket:env.BUCKET,resolveIdentity:auth.identity})(req);
-   if(['/login','/register','/recover','/admin','/account'].includes(url.pathname)){
+   const url=new URL(req.url),auth=authService(env.DB,env);
+   const response=await auth.handle(req);if(response)return auth.finish(response);
+   if(url.pathname.startsWith('/api/')||url.pathname.startsWith('/media/'))return auth.finish(await createStoreHandler({db:env.DB,bucket:env.BUCKET,resolveIdentity:auth.identity})(req));
+   if(['/login','/register','/recover','/confirm','/admin','/account'].includes(url.pathname)){
     const assetUrl=new URL('/dashboard.html',url);const r=await env.ASSETS.fetch(new Request(assetUrl,{method:'GET'}));
     const headers=new Headers(r.headers);headers.set('Cache-Control','no-store');headers.set('X-Content-Type-Options','nosniff');headers.set('Referrer-Policy','same-origin');headers.set('Content-Security-Policy',"frame-ancestors 'none'");return new Response(r.body,{status:r.status,headers});
    }

@@ -1,0 +1,3 @@
+# Copy to .dev.vars locally. These are placeholders, not a connected project.
+SUPABASE_URL="https://YOUR_PROJECT_REF.supabase.co"
+SUPABASE_PUBLISHABLE_KEY="YOUR_SUPABASE_PUBLISHABLE_KEY"

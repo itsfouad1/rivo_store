@@ -1,0 +1,45 @@
+تحديث RIVO: Supabase Auth + تسجيل الدخول باستخدام Google
+
+هذه الحزمة تحتوي الملفات المعدلة والجديدة كاملة فقط، مقارنة بأول نسخة Cloudflare التي كانت تستخدم PBKDF2 ورمز استرداد دائم.
+لا تستبدل المشروع بالكامل بهذه الحزمة؛ انسخ محتوياتها داخل مجلد مشروعك الحالي ووافق على استبدال الملفات المتطابقة. احتفظ بنسخة احتياطية أولًا.
+
+الملفات المعدّلة:
+lib/auth.mjs
+worker.mjs
+public/dashboard.js
+public/dashboard.css
+tests/auth.test.mjs
+README_AR.md
+
+الملفات الجديدة:
+migrations/0003_supabase_roles.sql
+email-templates/confirm-signup.html
+email-templates/reset-password.html
+scripts/update-auth-config.mjs
+
+لم أضع wrangler.json بديلًا حتى لا تفقد database_id وإعدادات حسابك وR2.
+السكريبت المرفق يضيف إعدادات Supabase ومسارات الدخول إلى ملفك الحالي ويحفظ نسخة احتياطية منه.
+
+بعد نسخ الملفات، افتح PowerShell داخل مجلد المشروع الحالي ونفّذ:
+
+node scripts/update-auth-config.mjs
+npm test
+npm run db:remote
+npm run deploy
+
+لا تحتاج npm install إذا كانت اعتمادات المشروع مثبتة؛ لم تتغير الحزم.
+لا تحذف migrations القديمة أو قاعدة البيانات. الترحيل الجديد يضيف جدول صلاحيات Supabase فقط.
+إذا لديك حسابات وطلبات فعلية بالنسخة القديمة، راجع قسم نقل الحسابات في README_AR.md قبل النشر؛ لا تنقل ملكية الطلبات اعتمادًا على تطابق الإيميل وحده.
+
+بعد النشر:
+Site URL داخل Supabase:
+https://rivo-store.rivo1.workers.dev
+Redirect URL داخل Supabase:
+https://rivo-store.rivo1.workers.dev/api/auth/callback**
+Google JavaScript origin:
+https://rivo-store.rivo1.workers.dev
+Google authorized redirect URI:
+https://atgxzobzrnjazrgimqqy.supabase.co/auth/v1/callback
+
+Google أصبح مفعّلًا في مشروع Supabase حسب آخر فحص. لا تزال تجربة الدخول الكاملة بعد النشر مطلوبة.
+تأكيد الإيميل واسترداد كلمة المرور يحتاجان خدمة SMTP والقوالب المرفقة؛ راجع الدليل.
