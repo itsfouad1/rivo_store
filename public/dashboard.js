@@ -44,6 +44,11 @@ const labels = {
   cancelled: 'ملغي',
   unpaid: 'غير مدفوع',
   paid: 'مدفوع',
+  refunded: 'مسترجع',
+  partially_refunded: 'استرجاع جزئي',
+  test_paid: 'دفع تجريبي',
+  test_refunded: 'استرجاع تجريبي',
+  test_partially_refunded: 'استرجاع جزئي تجريبي',
 };
 const badge = (key) =>
   `<span class="badge ${['active', 'completed', 'paid'].includes(key) ? 'green' : ['cancelled', 'archived'].includes(key) ? 'red' : ['processing', 'both'].includes(key) ? 'purple' : 'yellow'}">${labels[key] || esc(key)}</span>`;
@@ -253,7 +258,7 @@ function editProduct(id) {
         ['both', 'واتساب أو بوابة الدفع'],
       ],
       true,
-    )}<div class="info-box field full">بوابة الدفع غير مربوطة حاليًا. يمكن حفظ اختيارك، وسيظهر خيار البوابة للزبون غير متاح حتى يكتمل الربط. لا تُعتبر محادثة واتساب إثبات دفع.</div>${field('رابط صورة المنتج', 'image_url', p.image_url, { full: true, max: 1000, placeholder: 'https://… أو ارفع صورة أدناه' })}<label class="field full">أو ارفع صورة<input class="file-input" id="image-file" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG أو JPG أو WebP، حتى 4 ميجابايت.</small><span id="upload-state"></span></label>${select(
+    )}<div class="info-box field full">الدفع عبر Payunit بالدولار عند تهيئة المفاتيح. الوضع التجريبي متاح لحساب الإدارة فقط. لا تُعتبر محادثة واتساب إثبات دفع.</div>${field('رابط صورة المنتج', 'image_url', p.image_url, { full: true, max: 1000, placeholder: 'https://… أو ارفع صورة أدناه' })}<label class="field full">أو ارفع صورة<input class="file-input" id="image-file" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG أو JPG أو WebP، حتى 4 ميجابايت.</small><span id="upload-state"></span></label>${select(
       'حالة النشر',
       'status',
       p.status,
@@ -328,7 +333,7 @@ function deleteProduct(id) {
   });
 }
 function orderTable(orders) {
-  return `<div class="table-wrap"><table><thead><tr><th>رقم الطلب / العميل</th><th>الإجمالي</th><th>طريقة الطلب</th><th>الدفع</th><th>الحالة</th><th></th></tr></thead><tbody>${orders.map((o) => `<tr><td><b>#${o.id.slice(0, 8)}</b><br><small>${esc(o.customer_name)}</small></td><td>${esc(money(o.total_cents, o.currency))}</td><td>${badge(o.payment_method)}</td><td>${badge(o.payment_status)}</td><td>${badge(o.status)}</td><td><button class="text-btn" onclick="editOrder('${o.id}')">عرض وتحديث</button></td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>رقم الطلب / العميل</th><th>الإجمالي</th><th>طريقة الطلب</th><th>الدفع</th><th>الحالة</th><th></th></tr></thead><tbody>${orders.map((o) => `<tr><td><b>#${o.id.slice(0, 8)}</b><br><small>${esc(o.customer_name)}</small></td><td>${esc(money(o.total_cents, o.currency))}</td><td>${badge(o.payment_method)}</td><td>${badge(o.payment_status)}</td><td>${o.payment_status.startsWith('test_') ? '<span class="badge purple">اختبار مكتمل</span>' : badge(o.status)}</td><td><button class="text-btn" onclick="editOrder('${o.id}')">عرض وتحديث</button></td></tr>`).join('')}</tbody></table></div>`;
 }
 function ordersView() {
   const list =
@@ -358,10 +363,22 @@ function editOrder(id) {
     )}${select('حالة الدفع (تأكيد يدوي)', 'payment_status', o.payment_status, [
       ['unpaid', 'لم يتم تحصيل الدفع'],
       ['paid', 'تم تأكيد استلام الدفع'],
+      ['refunded', 'مسترجع'],
+      ['partially_refunded', 'استرجاع جزئي'],
+      ['test_paid', 'دفع تجريبي'],
+      ['test_refunded', 'استرجاع تجريبي'],
+      ['test_partially_refunded', 'استرجاع جزئي تجريبي'],
     ])}<label class="field full">تحديث للزبون<textarea name="customer_update" maxlength="2000" placeholder="مثال: تم استلام طلبك ونعمل على تنفيذه…">${esc(o.customer_update)}</textarea><small>هذا النص يظهر للزبون في حسابه. تجنّب إدخال مفاتيح أو بيانات خاصة بمتجر آخر.</small></label><label class="field full">ملاحظة داخلية للإدارة<textarea name="admin_note" maxlength="2000">${esc(o.admin_note)}</textarea><small>لا تظهر للزبون.</small></label></div><p class="warning-box">اختر «مدفوع» فقط بعد التحقق من استلام المبلغ فعليًا. فتح واتساب أو إرسال الرسالة لا يؤكد الدفع. إكمال الطلب يتطلب حالة دفع مؤكدة.</p>${formEnd('حفظ تحديث الطلب')}</form><button class="secondary" type="button" onclick="foxOrder('${id}')">تنفيذ / متابعة منتجات FoxReload</button>`,
   );
+  if (o.payment_method === 'gateway') {
+    const field = $('order-form').elements.namedItem('payment_status');
+    field.disabled = true;
+    field.closest('label').firstChild.textContent = 'حالة الدفع (تُحدّث من Payunit)';
+  }
   bindForm('order-form', async (fd) => {
-    await send('/api/admin/orders/' + id, 'PUT', Object.fromEntries(fd));
+    const values = Object.fromEntries(fd);
+    if (o.payment_method === 'gateway') values.payment_status = o.payment_status;
+    await send('/api/admin/orders/' + id, 'PUT', values);
     closeEditor();
     await refresh();
     toast('تم تحديث الطلب');
@@ -465,7 +482,7 @@ function settingsView() {
         ['ILS', 'شيكل ILS'],
         ['JOD', 'دينار JOD'],
       ],
-    )}${field('اسم بوابة الدفع الظاهر', 'gatewayLabel', s.gatewayLabel, { max: 180 })}</div><div class="warning-box" style="margin-top:18px">بوابة الدفع غير متصلة. تغيير الاسم لا يفعّل تحصيل الدفع. الربط يحتاج وثائق البوابة ومفاتيح الخادم والتحقق من إشعارات الدفع قبل فتحه للزبائن.</div></section><div class="form-error" role="alert"></div><button class="primary" type="submit">حفظ الإعدادات</button></form>`;
+    )}${field('اسم بوابة الدفع الظاهر', 'gatewayLabel', s.gatewayLabel, { max: 180 })}</div><div class="warning-box" style="margin-top:18px">حالة Payunit: ${data.gatewayReady ? 'المفاتيح مهيأة' : 'المفاتيح غير مهيأة'}. تُضبط مفاتيح البوابة ووضع test أو live في Cloudflare. تغيير الاسم هنا لا يغيّر إعدادات الاتصال.</div></section><div class="form-error" role="alert"></div><button class="primary" type="submit">حفظ الإعدادات</button></form>`;
   bindForm('settings-form', async (fd) => {
     await send('/api/admin/settings', 'PUT', Object.fromEntries(fd));
     await refresh();
@@ -563,7 +580,7 @@ function customer(orders) {
   const list = orderTab === 'purchases' ? paid : orders;
   document.title = 'حسابي | ريفو';
   $('app').innerHTML =
-    `<header class="customer-header"><div class="wrap topbar">${brand}<nav><a href="/">المتجر</a>${user.role === 'admin' ? '<a href="/admin">لوحة الإدارة</a>' : ''}</nav><a class="store-login" href="/login" data-logout target="_top">تسجيل الخروج ←</a></div></header><main class="customer-wrap"><div class="customer-welcome"><div><h1>أهلًا ${esc(user.name.split(' ')[0])} 👋</h1><p>طلباتك ومشترياتك من ريفو، كلها هون.</p></div><a class="primary" href="/">تصفّح المتجر ←</a></div><div class="stats customer-stats">${stat('طلباتي', orders.length, 'كل الطلبات')}${stat('مشترياتي', paid.length, 'طلبات مدفوعة')}${stat('قيد المتابعة', orders.filter((o) => !['completed', 'cancelled'].includes(o.status)).length, 'طلبات لم تكتمل')}</div><section class="panel"><div class="tabs"><button id="tab-all" class="${orderTab === 'all' ? 'active' : ''}">كل الطلبات</button><button id="tab-purchases" class="${orderTab === 'purchases' ? 'active' : ''}">المشتريات المدفوعة</button></div>${list.length ? list.map((o) => `<div class="order-card"><div class="order-card-top"><code>#${o.id.slice(0, 8)}</code><div>${badge(o.status)} ${badge(o.payment_status)}</div></div>${o.items.map((x) => `<div class="order-item"><span>${esc(x.name)} × ${x.quantity}${x.region ? ' · ' + esc(x.region) : ''}</span><b>${esc(money(x.unit_cents * x.quantity, o.currency))}</b></div>`).join('')}<div class="order-meta"><span>${date(o.created_at)}</span><span>${labels[o.payment_method]}</span><strong>الإجمالي ${esc(money(o.total_cents, o.currency))}</strong></div><button type="button" class="secondary" onclick="showDelivery('${o.id}')">عرض الأكواد ونتيجة الشحن</button>${o.customer_update ? '<div class="customer-update"><strong>تحديث ريفو</strong><br>' + esc(o.customer_update) + '</div>' : ''}${o.payment_status !== 'paid' && o.payment_method === 'whatsapp' ? '<p class="small-note">فتح محادثة واتساب لا يؤكد الدفع. تظهر عملية الشراء بعد تأكيد الإدارة استلام المبلغ.</p>' : ''}</div>`).join('') : empty(orderTab === 'purchases' ? 'لسه ما عندك مشتريات مدفوعة' : 'لسه ما عندك طلبات', orderTab === 'purchases' ? 'بعد تأكيد الدفع، رح تلاقي المنتجات اللي اشتريتها هون.' : 'ابدأ بتصفّح المتجر واختار المنتج المناسب إلك.', '<a class="primary" href="/">استكشف المنتجات</a>')}</section></main>`;
+    `<header class="customer-header"><div class="wrap topbar">${brand}<nav><a href="/">المتجر</a>${user.role === 'admin' ? '<a href="/admin">لوحة الإدارة</a>' : ''}</nav><a class="store-login" href="/login" data-logout target="_top">تسجيل الخروج ←</a></div></header><main class="customer-wrap"><div class="customer-welcome"><div><h1>أهلًا ${esc(user.name.split(' ')[0])} 👋</h1><p>طلباتك ومشترياتك من ريفو، كلها هون.</p></div><a class="primary" href="/">تصفّح المتجر ←</a></div><div class="stats customer-stats">${stat('طلباتي', orders.length, 'كل الطلبات')}${stat('مشترياتي', paid.length, 'طلبات مدفوعة')}${stat('قيد المتابعة', orders.filter((o) => !['completed', 'cancelled'].includes(o.status)).length, 'طلبات لم تكتمل')}</div><section class="panel"><div class="tabs"><button id="tab-all" class="${orderTab === 'all' ? 'active' : ''}">كل الطلبات</button><button id="tab-purchases" class="${orderTab === 'purchases' ? 'active' : ''}">المشتريات المدفوعة</button></div>${list.length ? list.map((o) => `<div class="order-card"><div class="order-card-top"><code>#${o.id.slice(0, 8)}</code><div>${o.payment_status.startsWith('test_') ? '<span class="badge purple">اختبار مكتمل</span>' : badge(o.status)} ${badge(o.payment_status)}</div></div>${o.items.map((x) => `<div class="order-item"><span>${esc(x.name)} × ${x.quantity}${x.region ? ' · ' + esc(x.region) : ''}</span><b>${esc(money(x.unit_cents * x.quantity, o.currency))}</b></div>`).join('')}<div class="order-meta"><span>${date(o.created_at)}</span><span>${labels[o.payment_method]}</span><strong>الإجمالي ${esc(money(o.total_cents, o.currency))}</strong></div><a class="primary" href="/order.html?order=${encodeURIComponent(o.id)}">تفاصيل الطلب والتسليم ←</a>${o.payment_method === 'gateway' ? '<p><a class="primary" href="/payment.html?order=' + encodeURIComponent(o.id) + '">مراجعة مبلغ وحالة الدفع بالدولار</a></p>' : ''}${o.customer_update ? '<div class="customer-update"><strong>تحديث ريفو</strong><br>' + esc(o.customer_update) + '</div>' : ''}${o.payment_status !== 'paid' && o.payment_method === 'whatsapp' ? '<p class="small-note">فتح محادثة واتساب لا يؤكد الدفع. تظهر عملية الشراء بعد تأكيد الإدارة استلام المبلغ.</p>' : ''}</div>`).join('') : empty(orderTab === 'purchases' ? 'لسه ما عندك مشتريات مدفوعة' : 'لسه ما عندك طلبات', orderTab === 'purchases' ? 'بعد تأكيد الدفع، رح تلاقي المنتجات اللي اشتريتها هون.' : 'ابدأ بتصفّح المتجر واختار المنتج المناسب إلك.', '<a class="primary" href="/">استكشف المنتجات</a>')}</section></main>`;
   $('tab-all').onclick = () => {
     orderTab = 'all';
     customer(orders);

@@ -1,0 +1,155 @@
+.order-page {
+  max-width: 1000px;
+  margin: auto;
+  padding: 32px 20px 64px;
+}
+.order-page h1 {
+  font-size: 28px;
+  letter-spacing: 0;
+}
+.eyebrow {
+  font-size: 12px;
+  color: var(--muted);
+}
+.order-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(230px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.order-page .panel {
+  margin-bottom: 18px;
+}
+.order-page h2 {
+  font-size: 18px;
+  margin: 0 0 18px;
+}
+.order-page h3 {
+  font-size: 15px;
+}
+.order-summary {
+  background: linear-gradient(120deg, #f0eaff, #e9fbfb);
+  border-color: #ded3fc;
+}
+.order-summary h2 {
+  font-size: 22px;
+  margin: 12px 0;
+}
+.order-summary p {
+  line-height: 1.9;
+}
+.order-id {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.order-facts {
+  margin: 0;
+}
+.order-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.order-facts dt {
+  color: var(--muted);
+}
+.order-facts dd {
+  margin: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.order-page .order-item {
+  gap: 16px;
+}
+.order-item small {
+  display: block;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+.order-actions a {
+  text-align: center;
+}
+.order-delivery {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.order-delivery summary {
+  cursor: pointer;
+  color: #6942b9;
+  padding: 12px 0;
+}
+.code-row {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  background: #f5f3fb;
+  padding: 12px;
+  border-radius: 10px;
+  margin: 8px 0;
+}
+.code-row pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  user-select: text;
+  font-size: 14px;
+}
+.order-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.9;
+}
+.order-page button:focus-visible,
+.order-page a:focus-visible,
+.order-page summary:focus-visible {
+  outline: 3px solid #8d65ff;
+  outline-offset: 3px;
+}
+.order-page button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.order-total {
+  font-size: 23px;
+  font-weight: 700;
+}
+.order-page .helper {
+  line-height: 1.8;
+}
+.order-page a.primary,
+.order-page a.secondary {
+  display: inline-block;
+}
+.order-page [hidden] {
+  display: none !important;
+}
+@media (max-width: 680px) {
+  .order-layout {
+    grid-template-columns: 1fr;
+  }
+  .order-page {
+    padding: 24px 14px;
+  }
+  .order-page h1 {
+    font-size: 23px;
+  }
+  .order-page .page-head {
+    align-items: start;
+  }
+  .order-actions a {
+    width: 100%;
+  }
+  .code-row {
+    flex-wrap: wrap;
+  }
+}

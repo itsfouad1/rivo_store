@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="referrer" content="same-origin" />
+    <title>تفاصيل الطلب | RIVO</title>
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/dashboard.css" />
+    <link rel="stylesheet" href="/order.css" />
+  </head>
+  <body>
+    <header class="customer-header">
+      <div class="wrap topbar">
+        <a class="brand" href="/"><img src="/assets/logo.png" alt="RIVO ريفو" /></a>
+        <nav><a href="/account">طلباتي</a> · <a href="/">المتجر</a></nav>
+      </div>
+    </header>
+    <main class="order-page">
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">RIVO / طلباتي</p>
+          <h1>تفاصيل الطلب</h1>
+        </div>
+        <button id="refresh" class="secondary" type="button">تحديث الطلب</button>
+      </div>
+      <p id="error" class="form-error" role="alert"></p>
+      <p id="notice" class="helper" role="status" aria-live="polite">جاري تحميل طلبك…</p>
+      <div id="details"></div>
+      <noscript
+        ><p>
+          فعّل JavaScript لعرض تفاصيل طلبك، أو ارجع إلى <a href="/account">حسابك</a>.
+        </p></noscript
+      >
+    </main>
+    <script src="/order.js"></script>
+  </body>
+</html>

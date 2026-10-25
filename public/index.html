@@ -17,6 +17,7 @@
     />
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/dashboard.css" />
+    <link rel="stylesheet" href="/catalog.css" />
     <link rel="icon" href="/assets/logo.png" />
   </head>
   <body class="storefront">
@@ -113,10 +114,42 @@
                   <option value="default">الافتراضي</option>
                   <option value="low">السعر: الأقل أولًا</option>
                   <option value="high">السعر: الأعلى أولًا</option>
+                  <option value="name">الاسم</option>
                 </select></label
               >
             </div>
           </div>
+          <div class="catalog-refine">
+            <label class="region-filter"
+              >منطقة تفعيل المنتج<select id="region">
+                <option value="">كل المناطق</option>
+              </select></label
+            ><label
+              >السعر من <span class="price-currency">ILS</span
+              ><input
+                id="price-min"
+                type="number"
+                min="0"
+                step="0.01"
+                inputmode="decimal"
+                placeholder="بدون حد" /></label
+            ><label
+              >السعر إلى <span class="price-currency">ILS</span
+              ><input
+                id="price-max"
+                type="number"
+                min="0"
+                step="0.01"
+                inputmode="decimal"
+                placeholder="بدون حد" /></label
+            ><label class="stock-check"
+              ><input id="available-only" type="checkbox" />المتاح للطلب فقط</label
+            ><button id="clear-filters" class="secondary" type="button">مسح الفلاتر</button>
+            <p id="filter-error" class="catalog-error" role="status"></p>
+          </div>
+          <p class="catalog-help">
+            منطقة التفعيل تخص حساب اللعبة أو المنصة، وهي مستقلة عن الدولة وعملة العرض.
+          </p>
           <div id="grid" class="grid"></div>
           <div id="empty" class="empty" hidden>
             <h3>ما لقينا منتجات</h3>
@@ -124,7 +157,8 @@
             <button id="reset" class="secondary">عرض كل المنتجات</button>
           </div>
           <p class="catalog-foot">
-            <span id="results"></span> · تأكّد من المنطقة والفئة وطريقة الطلب لكل منتج.
+            <span id="results" role="status" aria-live="polite"></span> · تأكّد من المنطقة والفئة
+            وطريقة الطلب لكل منتج.
           </p>
         </section>
         <section id="how" class="how">
@@ -230,6 +264,6 @@
       </div>
     </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="/app.js"></script>
+    <script type="module" src="/app.js"></script>
   </body>
 </html>

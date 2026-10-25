@@ -2,11 +2,15 @@ import { createFoxreload } from './lib/foxreload.mjs';
 import { createStoreHandler } from './lib/store-api.mjs';
 import { authService } from './lib/auth.mjs';
 import { ensureRates } from './lib/exchange.mjs';
+import { createPayunit, payunitMode } from './lib/payunit.mjs';
 export default {
   async fetch(req, env) {
     try {
       const url = new URL(req.url),
         auth = authService(env.DB, env);
+      const payment = createPayunit(env, auth.identity);
+      const paymentResponse = await payment.handle(req);
+      if (paymentResponse) return auth.finish(paymentResponse);
       const supplierResponse = await createFoxreload(env, auth.identity).handle(req);
       if (supplierResponse) return auth.finish(supplierResponse);
       const response = await auth.handle(req);
@@ -24,6 +28,8 @@ export default {
             bucket: env.BUCKET,
             resolveIdentity: auth.identity,
             foxEnabled: true,
+            gatewayReady: payment.configured(),
+            gatewayMode: payunitMode(env),
           })(req),
         );
       if (

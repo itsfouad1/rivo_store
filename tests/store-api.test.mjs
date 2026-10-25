@@ -223,6 +223,25 @@ test('customer isolation and internal notes stay private', async () => {
   assert.equal(o.idempotency_key, undefined);
   assert.equal(o.payment_status, 'paid');
 });
+test('order detail enforces ownership and returns only customer-safe information', async () => {
+  const path = '/api/orders/' + orderId;
+  assert.equal((await request(path, 'GET', null, null)).status, 401);
+  assert.equal((await request(path, 'GET', null, 'another')).status, 404);
+  assert.equal((await request(path, 'GET', null, 'owner')).status, 404);
+  const r = await request(path);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.order.id, orderId);
+  assert.equal(r.body.order.items.length, 1);
+  assert.equal(r.body.order.admin_note, undefined);
+  assert.equal(r.body.order.idempotency_key, undefined);
+  assert.equal(r.body.order.user_id, undefined);
+  assert.equal(r.body.order.customer_update, 'working on it');
+  const support = new URL(r.body.support_url);
+  assert.equal(support.hostname, 'wa.me');
+  assert.ok(support.searchParams.get('text').includes(orderId));
+  assert.ok(!support.searchParams.get('text').includes('private-only'));
+  assert.equal((await request('/api/orders/' + crypto.randomUUID())).status, 404);
+});
 test('cannot complete unpaid order; archived products cannot be ordered', async () => {
   assert.equal(
     (
