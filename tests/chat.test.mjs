@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {DatabaseSync} from 'node:sqlite';import {readFileSync} from 'node:fs';import {createStoreHandler} from '../lib/store-api.mjs';import {staffIdentity} from '../lib/staff.mjs';
 function setup(){
- const sql=new DatabaseSync(':memory:');for(const f of ['0001_store','0003_supabase_roles','0004_foxreload','0005_exchange_rates','0006_payunit','0007_product_guides','0009_staff','0010_chat','0011_chat_reads'])sql.exec(readFileSync(new URL('../migrations/'+f+'.sql',import.meta.url),'utf8'));
+ const sql=new DatabaseSync(':memory:');for(const f of ['0001_store','0003_supabase_roles','0004_foxreload','0005_exchange_rates','0006_payunit','0007_product_guides','0009_staff','0010_chat','0011_chat_reads','0012_support_tools'])sql.exec(readFileSync(new URL('../migrations/'+f+'.sql',import.meta.url),'utf8'));
  for(const id of ['buyer','other','support','second','admin','owner']){sql.prepare('INSERT INTO users VALUES (?,?,?,?)').run(id,id+'@test.invalid',id,'2026');if(['support','second','admin','owner'].includes(id))sql.prepare('INSERT INTO staff_access(user_id,role) VALUES (?,?)').run(id,id==='second'?'support':id);}
  function prepare(q,args=[]){return {q,args,bind(...v){return prepare(q,v)},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return sql.prepare(q).run(...args)}}}
  const db={prepare,async batch(ss){return ss.map(s=>sql.prepare(s.q).run(...s.args))}},handle=createStoreHandler({db,resolveIdentity:async r=>{const id=r.headers.get('who');return id?staffIdentity(db,{id,email:id+'@test.invalid',name:id,role:'customer'}):null}});
@@ -60,5 +60,68 @@ test('new reader receives handoff context, stale readers cannot acknowledge afte
  await x.action(id,'close','owner');
  assert.equal((await x.req('/summary')).data.unread_messages,1);
  assert.equal((await x.req('')).data.conversations[0].unread_count,1);
+});
+test('queue search and filters span customer data, literal identifiers and permitted assignments',async()=>{
+ const x=setup(),order=x.order(),id=(await x.create('buyer',{order_id:order,subject:'مشكلة تفعيل'})).data.id;
+ x.sql.prepare("UPDATE users SET name='أحمد الدعم',email='AHMAD@example.test' WHERE id='buyer'").run();
+ for(const q of ['احمد', 'ahmad@EXAMPLE.TEST', '#'+order.slice(0,8), '#'+id.slice(0,8), 'احمد تفعيل', 'https://rivo.test/order.html?order='+order]){
+  const r=await x.req('/queue?mode=all&q='+encodeURIComponent(q),'GET',undefined,'admin');assert.equal(r.status,200);assert.equal(r.data.total,1);assert.equal(r.data.conversations[0].id,id);
+ }
+ assert.equal((await x.req('/queue?q='+encodeURIComponent("%' OR 1=1 --"),'GET',undefined,'admin')).data.total,0);
+ await x.action(id,'assign','owner',{assignee:'second'});
+ assert.equal((await x.req('/queue?q='+id,'GET',undefined,'support')).data.total,0);
+ assert.equal((await x.req('/queue?assignee=second','GET',undefined,'support')).status,403);
+ assert.equal((await x.req('/queue?assignee=second','GET',undefined,'admin')).data.total,1);
+ assert.equal((await x.req('/queue?assignee=unassigned','GET',undefined,'admin')).data.total,0);
+ for(const bad of ['priority=bad','mode=bad','q='+'x'.repeat(201)])assert.equal((await x.req('/queue?'+bad,'GET',undefined,'admin')).status,400);
+});
+test('manager assignment is revision-guarded, rejects disabled accounts and preserves transcript/read privacy',async()=>{
+ const x=setup(),id=(await x.create()).data.id;
+ assert.equal((await x.action(id,'assign','support',{assignee:'second'})).status,403);
+ assert.equal((await x.action(id,'assign','owner',{assignee:'buyer'})).status,400);
+ assert.equal((await x.req('/staff','GET',undefined,'buyer')).status,403);
+ assert.equal((await x.req('/staff','GET',undefined,'support')).status,403);
+ const roster=await x.req('/staff','GET',undefined,'owner');assert.ok(roster.data.staff.some(u=>u.id==='second'));assert.ok(!roster.data.staff.some(u=>u.id==='buyer'));
+ x.sql.prepare("UPDATE staff_access SET active=0 WHERE user_id='second'").run();
+ assert.equal((await x.action(id,'assign','owner',{assignee:'second'})).status,400);
+ x.sql.prepare("UPDATE staff_access SET active=1 WHERE user_id='second'").run();
+ await x.action(id,'claim');await x.req('/'+id+'/messages','POST',{message:'private retained',internal:true,client_id:crypto.randomUUID()},'support');
+ const state=x.sql.prepare('SELECT revision FROM chat_conversations WHERE id=?').get(id);
+ assert.equal((await x.req('/'+id+'/action','POST',{action:'assign',assignee:'second',revision:state.revision},'owner')).status,200);
+ assert.equal((await x.req('/'+id+'/action','POST',{action:'assign',assignee:'support',revision:state.revision},'owner')).status,409);
+ assert.equal((await x.req('/'+id,'GET',undefined,'support')).status,404);
+ assert.ok((await x.req('/'+id,'GET',undefined,'second')).data.messages.some(m=>m.body==='private retained'));
+ assert.ok(!(await x.req('/'+id)).data.messages.some(m=>m.body==='private retained'));
+ await x.action(id,'close','owner');assert.equal((await x.action(id,'assign','owner',{assignee:'support'})).status,409);
+ const log=x.sql.prepare("SELECT target FROM audit WHERE action='chat_assign'").get();assert.equal(JSON.parse(log.target).assignee,'second');
+});
+test('priority changes require staff access, sort urgent first and never change order payment',async()=>{
+ const x=setup(),order=x.order(),a=(await x.create('buyer',{order_id:order})).data.id,b=(await x.create('other')).data.id;
+ assert.equal((await x.action(a,'priority','buyer',{priority:'urgent'})).status,403);
+ assert.equal((await x.action(a,'priority','support',{priority:'urgent'})).status,409);
+ await x.action(a,'claim');
+ assert.equal((await x.action(a,'priority','support',{priority:'urgent'})).status,200);
+ assert.equal((await x.action(a,'priority','second',{priority:'normal'})).status,409);
+ assert.equal((await x.action(a,'priority','owner',{priority:'bad'})).status,400);
+ assert.equal((await x.req('/queue','GET',undefined,'owner')).data.conversations[0].id,a);
+ assert.equal((await x.req('/queue?priority=normal','GET',undefined,'owner')).data.conversations[0].id,b);
+ assert.equal((await x.req('/queue?priority=urgent','GET',undefined,'owner')).data.total,1);
+ assert.equal(x.sql.prepare('SELECT payment_status FROM orders WHERE id=?').get(order).payment_status,'unpaid');
+ assert.equal((await x.req('/'+a)).data.conversation.priority,undefined);
+});
+test('canned replies are staff-only, manager editable with revision checks, never automatically sent',async()=>{
+ const x=setup();assert.equal((await x.req('/templates')).status,403);
+ const list=await x.req('/templates','GET',undefined,'support');assert.equal(list.data.templates.length,3);assert.equal(list.data.can_manage,false);
+ assert.equal((await x.req('/templates','POST',{title:'x',body:'x'},'support')).status,403);
+ assert.equal((await x.req('/templates','POST',{title:'x',body:'x'.repeat(3001)},'owner')).status,400);
+ const made=await x.req('/templates','POST',{title:'رد جديد',body:'<script>plain text</script>'},'owner');assert.equal(made.status,201);const id=made.data.id;
+ const edit={title:'رد معدل',body:'نص عادي',active:false,revision:1};
+ assert.equal((await x.req('/templates/'+id,'PUT',edit,'owner')).status,200);
+ assert.equal((await x.req('/templates/'+id,'PUT',edit,'owner')).status,409);
+ assert.ok(!(await x.req('/templates','GET',undefined,'support')).data.templates.some(t=>t.id===id));
+ assert.ok((await x.req('/templates','GET',undefined,'owner')).data.templates.some(t=>t.id===id&&!t.active));
+ assert.equal(x.sql.prepare('SELECT count(*) AS n FROM chat_messages').get().n,0);
+ assert.equal((await x.req('/templates/'+id,'PUT',{...edit,active:true,revision:2},'admin')).status,200);
+ assert.ok((await x.req('/templates','GET',undefined,'support')).data.templates.some(t=>t.id===id));
 });
 
