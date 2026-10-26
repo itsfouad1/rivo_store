@@ -13,5 +13,5 @@ export function mountAssistant(root,{request,onHuman,onClose}){
  find('[data-topics]').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(b.dataset.intent==='search'){form.elements.question.focus();error.textContent='اكتب اسم اللعبة أو المنصة في الحقل.';}else ask({intent:b.dataset.intent},b.textContent)});
  form.onsubmit=e=>{e.preventDefault();ask({question:form.elements.question.value},form.elements.question.value)};
  find('[data-human]').onclick=()=>{if(busy){error.textContent='انتظر انتهاء الرد ثم انتقل للموظف.';return}onHuman(summary()).catch(e=>error.textContent=e.message)};find('[data-close-bot]').onclick=onClose;
- return {start(){if(!started){started=true;ask({intent:'start'},'بداية المساعدة')}}};
+ return {setUnread(count){find('[data-human]').textContent=count?'عرض ردود الفريق ('+count+' جديدة)':'التحدث مع موظف';},start(){if(!started){started=true;ask({intent:'start'},'بداية المساعدة')}}};
 }

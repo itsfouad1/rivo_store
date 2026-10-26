@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {DatabaseSync} from 'node:sqlite';import {readFileSync} from 'node:fs';import {createStoreHandler} from '../lib/store-api.mjs';import {staffIdentity} from '../lib/staff.mjs';
 function setup(){
- const sql=new DatabaseSync(':memory:');for(const f of ['0001_store','0003_supabase_roles','0004_foxreload','0005_exchange_rates','0006_payunit','0007_product_guides','0009_staff','0010_chat'])sql.exec(readFileSync(new URL('../migrations/'+f+'.sql',import.meta.url),'utf8'));
+ const sql=new DatabaseSync(':memory:');for(const f of ['0001_store','0003_supabase_roles','0004_foxreload','0005_exchange_rates','0006_payunit','0007_product_guides','0009_staff','0010_chat','0011_chat_reads'])sql.exec(readFileSync(new URL('../migrations/'+f+'.sql',import.meta.url),'utf8'));
  for(const id of ['buyer','other','support','second','admin','owner']){sql.prepare('INSERT INTO users VALUES (?,?,?,?)').run(id,id+'@test.invalid',id,'2026');if(['support','second','admin','owner'].includes(id))sql.prepare('INSERT INTO staff_access(user_id,role) VALUES (?,?)').run(id,id==='second'?'support':id);}
  function prepare(q,args=[]){return {q,args,bind(...v){return prepare(q,v)},async first(){return sql.prepare(q).get(...args)||null},async all(){return {results:sql.prepare(q).all(...args)}},async run(){return sql.prepare(q).run(...args)}}}
  const db={prepare,async batch(ss){return ss.map(s=>sql.prepare(s.q).run(...s.args))}},handle=createStoreHandler({db,resolveIdentity:async r=>{const id=r.headers.get('who');return id?staffIdentity(db,{id,email:id+'@test.invalid',name:id,role:'customer'}):null}});
@@ -16,3 +16,49 @@ test('internal notes never appear in customer transcript and escalation hands co
 test('message retries and initial creation are idempotent even after the original chat closes',async()=>{const x=setup(),b={message:'first',client_id:crypto.randomUUID()};const a=await x.req('','POST',b),repeat=await x.req('','POST',b);assert.equal(a.data.id,repeat.data.id);const id=a.data.id;assert.equal(x.sql.prepare('SELECT count(*) AS n FROM chat_messages').get().n,1);assert.equal((await x.req('/'+id+'/close','POST',{})).status,200);assert.equal((await x.req('','POST',b)).data.id,id);assert.equal(x.sql.prepare('SELECT count(*) AS n FROM chat_conversations').get().n,1);assert.equal((await x.req('/'+id+'/messages','POST',{message:'late',client_id:crypto.randomUUID()})).status,409);const next=await x.create();assert.notEqual(next.data.id,id);assert.equal((await x.req('','POST',{...b,message:'changed'})).status,409)});
 test('waiting for customer, manager release, notes and role revocation preserve access rules',async()=>{const x=setup(),id=(await x.create()).data.id;await x.action(id,'claim');await x.action(id,'wait');assert.equal((await x.req('/'+id)).data.conversation.status,'waiting_customer');await x.req('/'+id+'/messages','POST',{message:'ردي',client_id:crypto.randomUUID()});assert.equal((await x.req('/'+id)).data.conversation.status,'assigned');await x.action(id,'release','owner');assert.equal((await x.req('/'+id,'GET',undefined,'support')).status,404);await x.action(id,'claim');x.sql.prepare("UPDATE staff_access SET active=0 WHERE user_id='support'").run();assert.equal((await x.req('/queue','GET',undefined,'support')).status,403);assert.equal((await x.req('/'+id,'GET',undefined,'support')).status,404);assert.equal((await x.action(id,'close','owner')).status,200)});
 test('validation, throttling, message pagination and hidden notes',async()=>{const x=setup(),id=(await x.create()).data.id;assert.equal((await x.req('/'+id+'?before=no')).status,400);assert.equal((await x.req('/queue?page=0','GET',undefined,'admin')).status,400);assert.equal((await x.req('/'+id+'/messages','POST',{message:'x'.repeat(4001),client_id:crypto.randomUUID()})).status,400);for(let i=0;i<29;i++)assert.equal((await x.req('/'+id+'/messages','POST',{message:'hello '+i,client_id:crypto.randomUUID()})).status,201);assert.equal((await x.req('/'+id+'/messages','POST',{message:'limit',client_id:crypto.randomUUID()})).status,429);const insert=x.sql.prepare("INSERT INTO chat_messages(conversation_id,sender_id,sender_kind,visibility,body,client_id,created_at) VALUES (?,'admin','staff',?,?,?,'2026')");for(let i=0;i<120;i++)insert.run(id,i%2?'internal':'public','note '+i,crypto.randomUUID());const latest=(await x.req('/'+id,'GET',undefined,'admin')).data;assert.equal(latest.messages.length,100);assert.equal(latest.has_more,true);const older=(await x.req('/'+id+'?before='+latest.messages[0].seq,'GET',undefined,'admin')).data;assert.equal(older.messages.length,50);assert.equal(older.has_more,false);assert.ok((await x.req('/'+id)).data.messages.every(m=>m.visibility==='public'))});
+test('read counters are private per user, exclude internal notes for buyers, and GET never acknowledges',async()=>{
+ const x=setup(),id=(await x.create()).data.id;
+ assert.equal((await x.req('/summary','GET',undefined,'support')).data.unread_messages,1);
+ assert.equal((await x.req('/summary','GET',undefined,'other')).data.unread_messages,0);
+ await x.action(id,'claim');
+ assert.equal((await x.req('/summary','GET',undefined,'second')).data.unread_messages,0);
+ const staffView=(await x.req('/'+id,'GET',undefined,'support')).data;
+ assert.equal((await x.req('/summary','GET',undefined,'support')).data.unread_messages,1);
+ assert.equal((await x.req('/'+id+'/read','POST',{last_seq:staffView.messages.at(-1).seq},'support')).status,200);
+ assert.equal((await x.req('/summary','GET',undefined,'support')).data.unread_messages,0);
+ await x.req('/'+id+'/messages','POST',{message:'private note',internal:true,client_id:crypto.randomUUID()},'support');
+ assert.equal((await x.req('/summary')).data.unread_messages,0);
+ const internal=x.sql.prepare("SELECT seq FROM chat_messages WHERE visibility='internal'").get().seq;
+ assert.equal((await x.req('/'+id+'/read','POST',{last_seq:internal})).status,400);
+ await x.req('/'+id+'/messages','POST',{message:'reply one',client_id:crypto.randomUUID()},'support');
+ const shown=(await x.req('/'+id)).data.messages.at(-1).seq;
+ await x.req('/'+id+'/messages','POST',{message:'reply two',client_id:crypto.randomUUID()},'support');
+ assert.equal((await x.req('/summary')).data.unread_messages,2);
+ await x.req('/'+id+'/read','POST',{last_seq:shown});
+ assert.equal((await x.req('/summary')).data.unread_messages,1);
+ assert.equal((await x.req('/'+id+'/read','POST',{last_seq:1},'other')).status,404);
+ assert.equal((await x.req('/'+id+'/read','POST',{last_seq:999999})).status,400);
+ const newer=(await x.req('/'+id)).data.messages.at(-1).seq;
+ await x.req('/'+id+'/read','POST',{last_seq:newer});await x.req('/'+id+'/read','POST',{last_seq:shown});
+ assert.equal((await x.req('/summary')).data.unread_messages,0);
+ assert.equal((await x.req('/summary','GET',undefined,'owner')).data.unread_messages,4);
+ await x.action(id,'close');
+ assert.equal((await x.req('/summary')).data.unread_messages,0);
+});
+test('new reader receives handoff context, stale readers cannot acknowledge after escalation',async()=>{
+ const x=setup(),id=(await x.create()).data.id;await x.action(id,'claim');
+ const old=(await x.req('/'+id,'GET',undefined,'support')).data.messages[0].seq;
+ await x.action(id,'escalate','support',{reason:'internal reason'});
+ assert.equal((await x.req('/'+id+'/read','POST',{last_seq:old},'support')).status,404);
+ assert.equal((await x.req('/summary','GET',undefined,'support')).data.unread_messages,0);
+ assert.equal((await x.req('/summary','GET',undefined,'owner')).data.unread_messages,2);
+ const owner=(await x.req('/'+id,'GET',undefined,'owner')).data;
+ await x.req('/'+id+'/read','POST',{last_seq:owner.messages.at(-1).seq},'owner');
+ assert.equal((await x.req('/summary','GET',undefined,'owner')).data.unread_messages,0);
+ await x.action(id,'claim','owner');
+ await x.req('/'+id+'/messages','POST',{message:'management answer',client_id:crypto.randomUUID()},'owner');
+ await x.action(id,'close','owner');
+ assert.equal((await x.req('/summary')).data.unread_messages,1);
+ assert.equal((await x.req('')).data.conversations[0].unread_count,1);
+});
+
