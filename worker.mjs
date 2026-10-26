@@ -12,7 +12,7 @@ export default {
    const supplierResponse=await createFoxreload(env,auth.identity).handle(req);if(supplierResponse)return auth.finish(supplierResponse);
    const response=await auth.handle(req);if(response)return auth.finish(response);
    if(url.pathname==='/api/store'||url.pathname==='/api/orders'&&req.method==='POST'||/^\/api\/admin\/products\/[^/]+$/.test(url.pathname)&&req.method==='PUT')await ensureRates(env.DB);
-   if(url.pathname.startsWith('/api/')||url.pathname.startsWith('/media/'))return auth.finish(await createStoreHandler({db:env.DB,bucket:env.BUCKET,resolveIdentity:auth.identity,foxEnabled:true,gatewayReady:payment.configured(),gatewayMode:payunitMode(env)})(req));
+   if(url.pathname.startsWith('/api/')||url.pathname.startsWith('/media/'))return auth.finish(await createStoreHandler({db:env.DB,bucket:env.BUCKET,resolveIdentity:auth.identity,foxEnabled:true,gatewayReady:payment.configured(),gatewayMode:payunitMode(env),ai:env.AI,assistantAIEnabled:env.RIVO_AI_ENABLED!=='false',assistantAIDailyLimit:env.RIVO_AI_DAILY_LIMIT??80})(req));
    if(['/login','/register','/recover','/confirm','/admin','/account'].includes(url.pathname)){
     const assetUrl=new URL('/dashboard.html',url);const r=await env.ASSETS.fetch(new Request(assetUrl,{method:'GET'}));
     const headers=new Headers(r.headers);headers.set('Cache-Control','no-store');headers.set('X-Content-Type-Options','nosniff');headers.set('Referrer-Policy','same-origin');headers.set('Content-Security-Policy',"frame-ancestors 'none'");return new Response(r.body,{status:r.status,headers});

@@ -3,7 +3,9 @@
   "name": "rivo-store",
   "main": "worker.mjs",
   "compatibility_date": "2026-05-15",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "workers_dev": true,
   "assets": {
     "directory": "./public",
@@ -34,11 +36,17 @@
     }
   ],
   "triggers": {
-    "crons": ["17 3 * * *", "*/15 * * * *"]
+    "crons": [
+      "17 3 * * *",
+      "*/15 * * * *"
+    ]
   },
   "vars": {
     "SUPABASE_URL": "https://atgxzobzrnjazrgimqqy.supabase.co",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_JQf6jNZOY79JBNcswt2MUg_frTiEQ3-",
     "FOXRELOAD_LIVE_ENABLED": "false"
+  },
+  "ai": {
+    "binding": "AI"
   }
 }
