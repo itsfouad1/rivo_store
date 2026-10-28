@@ -123,6 +123,60 @@
   font-size: 23px;
   font-weight: 700;
 }
+.order-progress {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 20px 0 0;
+  margin: 20px 0 0;
+  border-top: 1px solid #dcd3ef;
+}
+.order-progress li {
+  text-align: center;
+  color: #a49caf;
+  font-size: 11px;
+}
+.order-progress li > span {
+  display: grid;
+  place-items: center;
+  margin: auto auto 8px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #dcd6e7;
+  border-radius: 50%;
+  background: #f9f7fd;
+  font-weight: 700;
+}
+.order-progress b,
+.order-progress small {
+  display: block;
+}
+.order-progress small {
+  font-size: 9px;
+  margin-top: 5px;
+}
+.order-progress .done {
+  color: #2b897a;
+}
+.order-progress .done > span {
+  background: #dff3ed;
+  border-color: #b8ddd2;
+}
+.order-progress .current {
+  color: #6d44b9;
+}
+.order-progress .current > span {
+  background: #7b50cf;
+  border-color: #7b50cf;
+  color: white;
+}
+.order-progress-note {
+  font-size: 12px !important;
+  background: #fff8ee;
+  padding: 12px;
+  border-radius: 10px;
+}
 .order-page .helper {
   line-height: 1.8;
 }

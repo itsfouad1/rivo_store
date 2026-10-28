@@ -1,67 +1,663 @@
-const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const api=async(path,options={})=>{const r=await fetch(path,{...options,headers:{...(options.body&&!(options.body instanceof Blob)?{'Content-Type':'application/json'}:{}),...options.headers}});let data;try{data=await r.json()}catch{throw new Error('تعذّر قراءة الرد؛ حاول تحديث الصفحة.')}if(!r.ok)throw new Error(data.error||'تعذّر تنفيذ العملية');return data};
-const send=(path,method,data)=>api(path,{method,body:JSON.stringify(data)}),money=(n,c='USD')=>new Intl.NumberFormat('ar',{style:'currency',currency:c}).format(n/100),date=v=>new Intl.DateTimeFormat('ar-PS',{dateStyle:'medium',timeStyle:'short'}).format(new Date(v));
-const labels={draft:'مسودة',active:'منشور',archived:'مؤرشف',whatsapp:'واتساب',gateway:'بوابة الدفع',both:'واتساب + بوابة الدفع',contact_pending:'بانتظار التواصل',awaiting_payment:'بانتظار الدفع',processing:'قيد التنفيذ',completed:'مكتمل',cancelled:'ملغي',unpaid:'غير مدفوع',paid:'مدفوع',refunded:'مسترجع',partially_refunded:'استرجاع جزئي',test_paid:'دفع تجريبي',test_refunded:'استرجاع تجريبي',test_partially_refunded:'استرجاع جزئي تجريبي'};
-const badge=(key)=>`<span class="badge ${['active','completed','paid'].includes(key)?'green':['cancelled','archived'].includes(key)?'red':['processing','both'].includes(key)?'purple':'yellow'}">${labels[key]||esc(key)}</span>`;
-const brand='<a class="brand" href="/"><img src="/assets/logo.png" alt="RIVO ريفو"></a>';
-let user,data,current='overview',orderTab='all',search='',filter='all',selectedProducts=new Set();
-let toastTimer;function toast(text){$('toast').textContent=text;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),3500)}
-function empty(title,desc,action=''){return `<div class="empty-state"><span class="empty-symbol">◇</span><h3>${title}</h3><p>${desc}</p>${action}</div>`}
-function closeEditor(){$('editor').close()}
-function openEditor(html){$('editor-content').innerHTML=html;$('editor').showModal();$('editor-content').querySelector('[data-close]')?.addEventListener('click',closeEditor)}
-const editorHead=t=>`<div class="editor-header"><h2>${t}</h2><button type="button" class="close" data-close aria-label="إغلاق">×</button></div>`;
-const field=(label,name,value='',opts={})=>`<label class="field ${opts.full?'full':''}">${label}<input name="${name}" value="${esc(value)}" ${opts.type?`type="${opts.type}"`:''} ${opts.required?'required':''} ${opts.min!==undefined?`min="${opts.min}"`:''} ${opts.step?`step="${opts.step}"`:''} maxlength="${opts.max||500}" ${opts.placeholder?`placeholder="${opts.placeholder}"`:''}>${opts.help?`<small>${opts.help}</small>`:''}</label>`;
-const currencyChoices=[['ILS','شيكل ILS'],['JOD','دينار JOD'],['EGP','جنيه EGP'],['SAR','ريال SAR'],['AED','درهم AED'],['USD','دولار USD'],['TRY','ليرة TRY']];
-const select=(label,name,value,choices,full=false)=>{if(name==='currency')choices=currencyChoices;return `<label class="field ${full?'full':''}">${label}<select name="${name}">${choices.map(([v,l])=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`};
-function bindForm(id,save){const form=$(id);form.onsubmit=async e=>{e.preventDefault();const error=form.querySelector('.form-error'),button=form.querySelector('[type=submit]');error.textContent='';button.disabled=true;try{await save(new FormData(form),form)}catch(err){error.textContent=err.message}finally{button.disabled=false}}}
-const formEnd=label=>`<div class="form-error" role="alert"></div><div class="form-actions"><button type="submit" class="primary">${label}</button><button class="secondary" type="button" onclick="closeEditor()">إلغاء</button></div>`;
-async function refresh(){data=await api('/api/admin/overview');renderAdmin()}
-let nav=[['overview','⌘','نظرة عامة'],['products','▦','المنتجات'],['orders','▤','الطلبات'],['suppliers','⇄','الموردون والربط'],['foxreload','↗','FoxReload'],['policies','≡','صفحات وسياسات المتجر'],['settings','⚙','إعدادات المتجر']];
-const allAdminNav=nav;
-function renderAdmin(){nav=allAdminNav.filter(x=>x[0]==='overview'||user.role==='owner'||!user.permissions||user.permissions.includes(({products:'products',orders:'orders_write',suppliers:'suppliers',foxreload:'suppliers',settings:'settings',policies:'policies'})[x[0]]));nav.push(['chat','◌','محادثات الزبائن']);if(user.role==='owner')nav.push(['team','♙','إدارة الفريق']);current=location.hash.slice(1).split('?')[0]||'overview';if(!nav.some(x=>x[0]===current))current='overview';$('app').innerHTML=`<div class="admin-shell"><aside class="sidebar">${brand}<div class="side-label">إدارة المتجر</div><nav>${nav.map(([key,icon,title])=>`<a class="side-link ${key===current?'active':''}" href="#${key}"><span class="ico">${icon}</span>${title}</a>`).join('')}</nav><div class="side-bottom"><a class="side-link" href="/">↗ معاينة المتجر</a><a class="side-link" href="/account">◇ حسابي كزبون</a><a class="side-link" href="/login" data-logout target="_top">← تسجيل الخروج</a></div><div class="side-profile"><b>${esc(user.name)}</b>${esc(user.email)} <span class="admin-chip">مدير</span></div></aside><main class="admin-main"><div class="dash-topbar"><div><h1>${nav.find(x=>x[0]===current)[2]}</h1><p>RIVO / لوحة الإدارة</p></div><div class="top-user"><span class="badge purple">حساب الإدارة</span><span class="avatar">${esc(user.name.slice(0,1))}</span><a class="link-btn" href="/">المتجر ↗</a><a class="link-btn" target="_top" href="/login" data-logout>خروج</a></div></div><div class="dash-content" id="dash-view"></div></main></div>`;({overview:overview,products:productsView,orders:ordersView,suppliers:suppliersView,foxreload:foxView,chat:()=>{location.assign('/chat.html')},team:teamView,settings:settingsView,policies:()=>RivoPolicies.render()}[current])();window.RivoChatNotifications?.refresh();if(current==='overview')RivoAdminOrders.overviewAlerts()}
-function stat(title,value,note){return `<div class="stat"><span>${title}</span><strong>${value}</strong><small>${note}</small></div>`}
-function overview(){const paid=data.orders.filter(o=>o.payment_status==='paid'&&o.status!=='cancelled');const totals={};paid.forEach(o=>totals[o.currency]=(totals[o.currency]||0)+o.total_cents);const revenue=Object.entries(totals).map(([c,v])=>esc(money(v,c))).join(' / ')||'—';$('dash-view').innerHTML=`<div class="page-head"><div><h2>أهلًا في لوحة ريفو 👋</h2><p>منتجاتك وطلباتك وإعداداتك، في مكان واحد.</p></div><button class="primary" onclick="editProduct()">+ إضافة منتج</button></div><div class="stats">${stat('المنتجات المنشورة',data.products.filter(p=>p.status==='active').length,'من أصل '+data.products.length+' منتج')}${stat('الطلبات',data.orders.length,'طلبات مسجلة فعلًا')}${stat('تحتاج متابعة',data.orders.filter(o=>!['completed','cancelled'].includes(o.status)).length,'لم تكتمل بعد')}${stat('إجمالي التحصيل اليدوي',revenue,'حسب الطلبات المؤكدة المعروضة')}</div><section id="admin-order-alerts" aria-label="طلبات تحتاج متابعة"></section><div class="welcome-panel"><div><h3>${data.products.length?'كل شيء تحت سيطرتك':'جاهز تضيف أول منتج؟'}</h3><p>اختار لكل منتج طريقة الطلب المناسبة: واتساب، بوابة الدفع، أو الطريقتين. المنتجات اللي تحفظها كمسودات بتظل مخفية عن الزبائن.</p></div><span class="welcome-art">✦</span></div><div class="two-col"><section class="panel"><div class="panel-head"><h3>آخر الطلبات</h3><a href="#orders">كل الطلبات ←</a></div>${data.orders.length?orderTable(data.orders.slice(0,5)):empty('ما في طلبات بعد','لما ينشئ الزبون طلبًا، رح يظهر هون بحالته الحقيقية.')}</section><div><section class="panel"><h3>وصول سريع</h3><div class="quick-actions"><a href="#products">إدارة المنتجات <span>←</span></a><a href="#settings">رقم واتساب وبيانات المتجر <span>←</span></a><a href="#suppliers">تجهيز ربط الموردين <span>←</span></a></div></section><section class="panel"><h3>آخر النشاطات</h3>${data.activity.length?data.activity.slice(0,5).map(a=>`<div class="activity">${esc(({product_created:'إضافة منتج',product_updated:'تعديل منتج',product_archived:'أرشفة منتج',product_deleted:'حذف منتج',products_published:'نشر منتجات',products_deleted:'حذف منتجات',settings_updated:'تحديث إعدادات المتجر',supplier_created:'إضافة مورد',supplier_updated:'تعديل مورد',products_imported:'استيراد منتجات',order_updated:'تحديث طلب'})[a.action]||a.action)} · ${esc(a.target.slice(0,45))}<small>${date(a.created_at)}</small></div>`).join(''):'<p class="helper">تظهر هنا التغييرات بعد أول عملية حفظ.</p>'}</section></div></div>`}
-function visibleProducts(){return data.products.filter(p=>(filter==='all'||p.status===filter)&&(`${p.name} ${p.slug} ${p.category}`.toLowerCase().includes(search.toLowerCase())))}
-function productRows(){
- const list=visibleProducts(),allSelected=list.length>0&&list.every(p=>selectedProducts.has(p.id));
- $('product-bulk').innerHTML=`<span class="helper">تم تحديد ${selectedProducts.size} منتج</span><button class="primary" id="bulk-publish" ${selectedProducts.size?'':'disabled'}>نشر المحدد</button><button class="danger" id="bulk-delete" ${selectedProducts.size?'':'disabled'}>حذف المحدد</button>`;
- $('product-table').innerHTML=list.length?`<div class="table-wrap"><table><thead><tr><th><input id="select-all-products" type="checkbox" aria-label="تحديد كل المنتجات الظاهرة" ${allSelected?'checked':''}></th><th>المنتج</th><th>التصنيف</th><th>السعر</th><th>طريقة الطلب</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>${list.map(p=>`<tr><td><input class="product-select" type="checkbox" data-product-id="${p.id}" aria-label="تحديد ${esc(p.name)}" ${selectedProducts.has(p.id)?'checked':''}></td><td><div class="table-product"><span class="mini-cover">${p.image_url?`<img src="${esc(p.image_url)}" alt="">`:esc(p.name.slice(0,2))}</span><div><b>${esc(p.name)}</b><small>${esc(p.slug)}</small></div></div></td><td>${esc(p.category)}</td><td>${esc(money(p.price_cents,p.currency))}</td><td>${badge(p.payment_mode)}</td><td>${badge(p.status)}</td><td><div class="row-actions"><button onclick="editProduct('${p.id}')">تعديل</button>${p.status!=='archived'?`<button onclick="archiveProduct('${p.id}')">أرشفة</button>`:''}<button class="danger" onclick="deleteProduct('${p.id}')">حذف</button></div></td></tr>`).join('')}</tbody></table></div>`:empty('ما في منتجات مطابقة','جرّب تغيير البحث أو أضف منتجك الأول.');
- $('bulk-publish').onclick=()=>bulkProductAction('publish');$('bulk-delete').onclick=()=>bulkProductAction('delete');
- $('select-all-products')?.addEventListener('change',e=>{for(const p of list)e.target.checked?selectedProducts.add(p.id):selectedProducts.delete(p.id);productRows()});
- document.querySelectorAll('.product-select').forEach(box=>box.onchange=()=>{box.checked?selectedProducts.add(box.dataset.productId):selectedProducts.delete(box.dataset.productId);productRows()});
+const $ = (id) => document.getElementById(id),
+  esc = (v) =>
+    String(v ?? '').replace(
+      /[&<>"']/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+    );
+const api = async (path, options = {}) => {
+  const r = await fetch(path, {
+    ...options,
+    headers: {
+      ...(options.body && !(options.body instanceof Blob)
+        ? { 'Content-Type': 'application/json' }
+        : {}),
+      ...options.headers,
+    },
+  });
+  let data;
+  try {
+    data = await r.json();
+  } catch {
+    throw new Error('تعذّر قراءة الرد؛ حاول تحديث الصفحة.');
+  }
+  if (!r.ok) throw new Error(data.error || 'تعذّر تنفيذ العملية');
+  return data;
+};
+const send = (path, method, data) => api(path, { method, body: JSON.stringify(data) }),
+  money = (n, c = 'USD') =>
+    new Intl.NumberFormat('ar', { style: 'currency', currency: c }).format(n / 100),
+  date = (v) =>
+    new Intl.DateTimeFormat('ar-PS', { dateStyle: 'medium', timeStyle: 'short' }).format(
+      new Date(v),
+    );
+const labels = {
+  draft: 'مسودة',
+  active: 'منشور',
+  archived: 'مؤرشف',
+  whatsapp: 'واتساب',
+  gateway: 'بوابة الدفع',
+  both: 'واتساب + بوابة الدفع',
+  contact_pending: 'بانتظار التواصل',
+  awaiting_payment: 'بانتظار الدفع',
+  processing: 'قيد التنفيذ',
+  completed: 'مكتمل',
+  cancelled: 'ملغي',
+  unpaid: 'غير مدفوع',
+  paid: 'مدفوع',
+  refunded: 'مسترجع',
+  partially_refunded: 'استرجاع جزئي',
+  test_paid: 'دفع تجريبي',
+  test_refunded: 'استرجاع تجريبي',
+  test_partially_refunded: 'استرجاع جزئي تجريبي',
+};
+const badge = (key) =>
+  `<span class="badge ${['active', 'completed', 'paid'].includes(key) ? 'green' : ['cancelled', 'archived'].includes(key) ? 'red' : ['processing', 'both'].includes(key) ? 'purple' : 'yellow'}">${labels[key] || esc(key)}</span>`;
+const brand = '<a class="brand" href="/"><img src="/assets/logo.png" alt="RIVO ريفو"></a>';
+let user,
+  data,
+  current = 'overview',
+  orderTab = 'all',
+  search = '',
+  filter = 'all',
+  selectedProducts = new Set();
+let toastTimer;
+function toast(text) {
+  $('toast').textContent = text;
+  $('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('toast').classList.remove('show'), 3500);
 }
-function productsView(){search='';filter='all';selectedProducts=new Set();$('dash-view').innerHTML=`<div class="page-head"><div><h2>منتجات ريفو</h2><p>أضف، عدّل، وانشر منتجاتك بطريقتك.</p></div><button class="primary" onclick="editProduct()">+ إضافة منتج</button></div><section class="panel"><div class="toolbar"><input id="product-search" aria-label="ابحث عن منتج" placeholder="ابحث بالاسم أو رابط المنتج…"><select id="product-filter" aria-label="حالة المنتج"><option value="all">كل الحالات</option><option value="active">منشور</option><option value="draft">مسودة</option><option value="archived">مؤرشف</option></select></div><div class="toolbar" id="product-bulk"></div><div id="product-table"></div></section>`;productRows();$('product-search').oninput=e=>{search=e.target.value;productRows()};$('product-filter').onchange=e=>{filter=e.target.value;productRows()}}
-function bulkProductAction(action){
- const ids=[...selectedProducts];if(!ids.length)return;const deleting=action==='delete';
- openEditor(`${editorHead(deleting?'حذف المنتجات المحددة':'نشر المنتجات المحددة')}<div class="${deleting?'warning-box':'info-box'}">${deleting?'سيتم حذف '+ids.length+' منتجًا نهائيًا. إذا كان أي منتج مرتبطًا بطلب سابق، لن يُحذف أي منتج من المجموعة.':'سيتم نشر '+ids.length+' منتجًا ليظهر للزبائن في المتجر.'}</div><form id="bulk-products-form">${formEnd(deleting?'حذف المحدد نهائيًا':'نشر المحدد')}</form>`);
- bindForm('bulk-products-form',async()=>{const r=await send('/api/admin/products/bulk','POST',{action,ids});selectedProducts.clear();closeEditor();await refresh();toast(deleting?'تم حذف '+r.count+' منتجًا':'تم نشر '+r.count+' منتجًا')});
+function empty(title, desc, action = '') {
+  return `<div class="empty-state"><span class="empty-symbol">◇</span><h3>${title}</h3><p>${desc}</p>${action}</div>`;
 }
-function editProduct(id){const p=data.products.find(p=>p.id===id)||{name:'',slug:'',category:'شحن الألعاب',price_cents:0,currency:data.settings.currency,status:'draft',payment_mode:'whatsapp',sort_order:0};openEditor(`${editorHead(id?'تعديل المنتج':'منتج جديد')}<form id="product-form"><div class="form-grid">${field('اسم المنتج','name',p.name,{required:true,max:120})}${field('رابط المنتج (slug)','slug',p.slug,{required:true,max:100,placeholder:'pubg-60-uc',help:'أحرف إنجليزية صغيرة وأرقام وشرطات فقط.'})}${field('التصنيف','category',p.category,{required:true,max:80})}${field('المنطقة أو الدولة','region',p.region,{max:100,placeholder:'عالمي، US، فلسطين…'})}${field('السعر','price',(p.price_cents/100).toFixed(2),{type:'number',min:0,step:'0.01',required:true})}${select('العملة','currency',p.currency,[['USD','دولار USD'],['ILS','شيكل ILS'],['JOD','دينار JOD']])}<label class="field full">وصف المنتج<textarea name="description" maxlength="3000">${esc(p.description)}</textarea></label><label class="field full">وقت التنفيذ المتوقع<input name="delivery_estimate" value="${esc(p.delivery_estimate)}" maxlength="200" placeholder="مثال: خلال ساعات العمل بعد تأكيد الدفع"><small>اكتب المدة الفعلية لهذا المنتج؛ لا تظهر وعود زمنية تلقائية.</small></label><label class="field full">تعليمات التفعيل<textarea name="activation_instructions" maxlength="3000" placeholder="اكتب خطوات استخدام الكود أو الشحن، كل خطوة بسطر…">${esc(p.activation_instructions)}</textarea><small>تعليمات عامة تظهر قبل الشراء وبعده. لا تضع أكوادًا فعلية أو بيانات سرية هنا.</small></label><label class="field full">تنبيه قبل الشراء<textarea name="purchase_notice" maxlength="1500" placeholder="مثال: تأكد من تطابق منطقة حسابك مع البطاقة.">${esc(p.purchase_notice)}</textarea><small>وضّح القيود الخاصة بالمنتج. هذا الحقل ليس بديلًا عن سياسة المتجر.</small></label>${select('طريقة الطلب','payment_mode',p.payment_mode,[['whatsapp','طلب عبر واتساب'],['gateway','الدفع ببوابة الدفع'],['both','واتساب أو بوابة الدفع']],true)}<div class="info-box field full">الدفع عبر Payunit بالدولار عند تهيئة المفاتيح. الوضع التجريبي متاح لحساب الإدارة فقط. لا تُعتبر محادثة واتساب إثبات دفع.</div>${field('رابط صورة المنتج','image_url',p.image_url,{full:true,max:1000,placeholder:'https://… أو ارفع صورة أدناه'})}<label class="field full">أو ارفع صورة<input class="file-input" id="image-file" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG أو JPG أو WebP، حتى 4 ميجابايت.</small><span id="upload-state"></span></label>${select('حالة النشر','status',p.status,[['draft','مسودة'],['active','منشور'],['archived','مؤرشف']])}${field('ترتيب العرض','sort_order',p.sort_order,{type:'number',min:0,step:1})}<label class="check-field field full"><span><input type="checkbox" name="player_id_required" ${p.player_id_required?'checked':''}> يتطلب معرّف اللاعب عند الطلب</span></label>${select('مصدر المنتج / المورد','supplier_id',p.supplier_id||'',[['','إضافة يدوية'],...data.suppliers.map(s=>[s.id,s.name])])}${field('معرّف المنتج لدى المورد','supplier_product_id',p.supplier_product_id,{max:150})}</div>${formEnd('حفظ المنتج')}</form>`);
- const form=$('product-form');$('image-file').onchange=async e=>{const file=e.target.files[0];if(!file)return;const submit=form.querySelector('[type=submit]');submit.disabled=true;try{$('upload-state').textContent='جاري رفع الصورة…';const r=await api('/api/admin/upload',{method:'POST',body:file,headers:{'Content-Type':file.type}});form.elements.image_url.value=r.url;$('upload-state').textContent='تم رفع الصورة'}catch(err){$('upload-state').textContent=err.message}finally{submit.disabled=false}};
- bindForm('product-form',async(fd)=>{const value=Object.fromEntries(fd);const payload={...value,price_cents:Math.round(Number(value.price)*100),sort_order:Number(value.sort_order),player_id_required:fd.has('player_id_required')};await send(id?'/api/admin/products/'+id:'/api/admin/products',id?'PUT':'POST',payload);closeEditor();await refresh();toast('تم حفظ المنتج')});}
-function archiveProduct(id){const p=data.products.find(p=>p.id===id);openEditor(`${editorHead('أرشفة المنتج')}<p class="helper">إخفاء «${esc(p.name)}» من المتجر؟ تظل الطلبات السابقة محفوظة، ويمكن إعادة نشر المنتج من صفحة التعديل.</p><form id="archive-form">${formEnd('أرشفة المنتج')}</form>`);bindForm('archive-form',async()=>{await api('/api/admin/products/'+id,{method:'DELETE'});closeEditor();await refresh();toast('تمت أرشفة المنتج')})}
-function deleteProduct(id){const p=data.products.find(p=>p.id===id);openEditor(`${editorHead('حذف المنتج نهائيًا')}<div class="warning-box">سيتم حذف «${esc(p.name)}» من قائمة المنتجات نهائيًا. لا يمكن التراجع عن هذه العملية.</div><p class="helper">إذا كان المنتج مرتبطًا بطلب سابق، سيمنع النظام الحذف ويطلب منك أرشفته بدلًا من ذلك حفاظًا على سجل الطلب.</p><form id="delete-product-form">${formEnd('حذف نهائي')}</form>`);bindForm('delete-product-form',async()=>{await api('/api/admin/products/'+id+'/permanent',{method:'DELETE'});closeEditor();await refresh();toast('تم حذف المنتج نهائيًا')})}
-function orderTable(orders){return RivoAdminOrders.table(orders)}
-function ordersView(){RivoAdminOrders.render()}
-async function editOrder(id){let o;try{({order:o}=await api('/api/admin/orders/'+id));}catch(e){toast(e.message);return}const oldIndex=data.orders.findIndex(x=>x.id===id);if(oldIndex>=0)data.orders[oldIndex]=o;else data.orders.push(o);openEditor(`${editorHead('طلب #'+o.id.slice(0,8))}<p class="helper">${esc(o.customer_name)} · ${esc(o.customer_email)}<br>${date(o.created_at)}</p>${RivoAdminOrders.extra(o)}<div class="info-box">${o.items.map(x=>`${esc(x.name)} × ${x.quantity} — ${esc(x.region)} — ${esc(money(x.unit_cents*x.quantity,o.currency))}`).join('<br>')}<br><strong>الإجمالي: ${esc(money(o.total_cents,o.currency))}</strong>${o.player_id?'<br>معرّف اللاعب: '+esc(o.player_id):''}${o.customer_note?'<br>ملاحظة الزبون: '+esc(o.customer_note):''}</div><form id="order-form"><div class="form-grid">${select('حالة التنفيذ','status',o.status,['contact_pending','awaiting_payment','processing','completed','cancelled'].map(v=>[v,labels[v]]))}${select('حالة الدفع (تأكيد يدوي)','payment_status',o.payment_status,[['unpaid','لم يتم تحصيل الدفع'],['paid','تم تأكيد استلام الدفع'],['refunded','مسترجع'],['partially_refunded','استرجاع جزئي'],['test_paid','دفع تجريبي'],['test_refunded','استرجاع تجريبي'],['test_partially_refunded','استرجاع جزئي تجريبي']])}<label class="field full">تحديث للزبون<textarea name="customer_update" maxlength="2000" placeholder="مثال: تم استلام طلبك ونعمل على تنفيذه…">${esc(o.customer_update)}</textarea><small>هذا النص يظهر للزبون في حسابه. تجنّب إدخال مفاتيح أو بيانات خاصة بمتجر آخر.</small></label><label class="field full">ملاحظة داخلية للإدارة<textarea name="admin_note" maxlength="2000">${esc(o.admin_note)}</textarea><small>لا تظهر للزبون.</small></label></div><p class="warning-box">اختر «مدفوع» فقط بعد التحقق من استلام المبلغ فعليًا. فتح واتساب أو إرسال الرسالة لا يؤكد الدفع. إكمال الطلب يتطلب حالة دفع مؤكدة.</p>${formEnd('حفظ تحديث الطلب')}</form><button class="secondary" type="button" onclick="foxOrder('${id}')">تنفيذ / متابعة منتجات FoxReload</button>`);if(o.payment_method==='gateway'){const field=$('order-form').elements.namedItem('payment_status');field.disabled=true;field.closest('label').firstChild.textContent='حالة الدفع (تُحدّث من Payunit)';}bindForm('order-form',async fd=>{const values=Object.fromEntries(fd);if(o.payment_method==='gateway')values.payment_status=o.payment_status;await send('/api/admin/orders/'+id,'PUT',values);closeEditor();await refresh();toast('تم تحديث الطلب')})}
-function suppliersView(){$('dash-view').innerHTML=`<div class="info-box">ربط FoxReload متاح من <a href="#foxreload">شاشة FoxReload ←</a></div><div class="page-head"><div><h2>الموردون والربط</h2><p>جهّز مصادر المنتجات وربط المعرّفات، ثم فعّل موائم API عند توفر وثائق المورد.</p></div><button class="primary" onclick="newSupplier()">+ إضافة مورد</button></div><div class="info-box">الربط التلقائي بواجهات الموردين يحتاج موائمًا مطابقًا لوثائق كل مورد. حاليًا يمكنك تسجيل المورد واستيراد كتالوجه بصيغة JSON كمسودات تراجعها قبل النشر.</div><div class="two-col"><section class="panel"><div class="panel-head"><h3>الموردون المسجلون</h3><span class="badge">${data.suppliers.length}</span></div>${data.suppliers.length?data.suppliers.map(s=>`<div class="supplier-card"><div><h3>${esc(s.name)}</h3><p class="mono">${esc(s.base_url||'لم يُضف رابط')}</p><p>${esc(s.notes)}</p>${s.secret_name?'<small>متغير المفتاح: <code>'+esc(s.secret_name)+'</code></small>':''}</div><div><span class="badge yellow">بانتظار موائم API</span><button class="text-btn" onclick="newSupplier('${s.id}')">تعديل</button></div></div>`).join(''):empty('أضف المورد الأول','اربط معرّفات منتجاتك بمصدرها، دون تخزين مفاتيح API في صفحات الموقع.')}</section><section class="panel"><h3>استيراد كتالوج</h3><p class="helper">ارفع JSON بالتنسيق الموضّح في النموذج. سيتم إنشاء المنتجات كمسودات فقط، مع مراجعة الأسماء والأسعار وطرق الطلب قبل نشرها.</p><div class="quick-actions"><button class="secondary" onclick="downloadTemplate()">تنزيل نموذج JSON</button><button class="primary" onclick="importCatalog()">استيراد منتجات JSON</button></div><div class="small-note">حتى 100 منتج لكل دفعة. لا تُنفّذ طلبات أو مدفوعات لدى المورد من هذه الشاشة.</div></section></div>`}
-function newSupplier(id){const s=data.suppliers.find(x=>x.id===id)||{};openEditor(`${editorHead(id?'تعديل المورد':'إضافة مورد')}<form id="supplier-form"><div class="form-grid">${field('اسم المورد','name',s.name||'',{required:true,max:100,full:true})}${field('رابط API الأساسي','base_url',s.base_url||'',{type:'url',max:500,full:true,placeholder:'https://api.supplier.example/'})}${field('اسم متغير مفتاح API','secret_name',s.secret_name||'',{max:80,full:true,placeholder:'SUPPLIER_API_KEY',help:'اسم المتغير فقط، وليس قيمة المفتاح. تتم إضافة القيمة بأمان ضمن إعدادات الخادم عند الربط.'})}<label class="field full">ملاحظات<textarea name="notes" maxlength="1000" placeholder="رابط الوثائق، العملة، آلية الكتالوج…">${esc(s.notes)}</textarea></label></div>${formEnd('حفظ المورد')}</form>`);bindForm('supplier-form',async fd=>{await send(id?'/api/admin/suppliers/'+id:'/api/admin/suppliers',id?'PUT':'POST',Object.fromEntries(fd));closeEditor();await refresh();toast('تم تسجيل المورد')})}
-function downloadTemplate(){const example={products:[{name:'اسم المنتج',slug:'example-product',category:'بطاقات رقمية',description:'وصف الفئة والمنطقة وشروط الاستخدام',price_cents:1000,currency:'USD',image_url:'',payment_mode:'whatsapp',region:'US',player_id_required:false,supplier_product_id:'SKU-001',sort_order:0}]};const url=URL.createObjectURL(new Blob([JSON.stringify(example,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='rivo-catalog-template.json';a.click();URL.revokeObjectURL(url)}
-function importCatalog(){openEditor(`${editorHead('استيراد منتجات كمسودات')}<form id="import-form"><div class="form-grid">${select('المورد','supplier_id','',[['','استيراد يدوي'],...data.suppliers.map(s=>[s.id,s.name])],true)}<label class="field full">ملف JSON<input type="file" id="catalog-file" accept="application/json,.json" required></label></div><p class="helper" id="import-preview">اختَر الملف لمراجعة عدد المنتجات وأسمائها قبل الاستيراد.</p>${formEnd('تأكيد استيراد المسودات')}</form>`);let payload=null;$('catalog-file').onchange=async e=>{payload=null;try{const f=e.target.files[0];if(f.size>180000)throw new Error('حجم الملف كبير؛ الحد 180 كيلوبايت');const raw=JSON.parse(await f.text());const list=Array.isArray(raw)?raw:raw.products;if(!Array.isArray(list)||!list.length||list.length>100)throw new Error('يجب أن يحتوي الملف على 1–100 منتج');payload=list;$('import-preview').textContent='سيتم استيراد '+list.length+' منتجًا كمسودات: '+list.slice(0,8).map(x=>x.name).join('، ')}catch(err){$('import-preview').textContent=err.message}};bindForm('import-form',async fd=>{if(!payload)throw new Error('اختر ملفًا صالحًا أولًا');const r=await send('/api/admin/import','POST',{supplier_id:fd.get('supplier_id'),products:payload});closeEditor();await refresh();toast('تم استيراد '+r.count+' منتجًا كمسودات')})}
-function settingsView(){const s=data.settings;$('dash-view').innerHTML=`<div class="page-head"><div><h2>إعدادات المتجر</h2><p>حدّث ظهور الموقع وبيانات التواصل من مكان واحد.</p></div></div><form id="settings-form"><section class="panel"><h3>معلومات المتجر والواجهة الرئيسية</h3><div class="form-grid">${field('اسم المتجر','storeName',s.storeName,{required:true,max:180})}${field('الشعار النصي','tagline',s.tagline,{max:180})}${field('عنوان الهيرو','heroTitle',s.heroTitle,{max:180})}${field('النص المميز في الهيرو','heroAccent',s.heroAccent,{max:180})}<label class="field full">وصف الهيرو<textarea name="heroDescription" maxlength="600">${esc(s.heroDescription)}</textarea></label>${field('شريط الإعلان','announcement',s.announcement,{full:true,max:180})}</div></section><section class="panel"><h3>التواصل والطلبات</h3><div class="form-grid">${field('رقم واتساب المتجر','whatsapp',s.whatsapp,{max:20,placeholder:'970xxxxxxxxx',help:'أرقام فقط مع مفتاح الدولة، دون + أو مسافات. يفتح الزبون المحادثة ويرسل الرسالة بنفسه.'})}${field('حساب إنستغرام','instagram',s.instagram,{max:180,placeholder:'rivoo.ps'})}${select('عملة افتراضية للمنتجات الجديدة','currency',s.currency,[['USD','دولار USD'],['ILS','شيكل ILS'],['JOD','دينار JOD']])}${field('اسم بوابة الدفع الظاهر','gatewayLabel',s.gatewayLabel,{max:180})}</div><div class="warning-box" style="margin-top:18px">حالة Payunit: ${data.gatewayReady?'المفاتيح مهيأة':'المفاتيح غير مهيأة'}. تُضبط مفاتيح البوابة ووضع test أو live في Cloudflare. تغيير الاسم هنا لا يغيّر إعدادات الاتصال.</div></section><div class="form-error" role="alert"></div><button class="primary" type="submit">حفظ الإعدادات</button></form>`;bindForm('settings-form',async fd=>{await send('/api/admin/settings','PUT',Object.fromEntries(fd));await refresh();toast('تم تحديث إعدادات المتجر')})}
-function login(forcedMode,initialEmail=''){
- const mode=forcedMode||({'/register':'register','/recover':'forgot','/confirm':'confirm'}[location.pathname]||'login');
- const title={register:'خلّينا نتعرّف عليك',login:'أهلًا برجعتك',forgot:'نسيت كلمة المرور؟',reset:'كلمة مرور جديدة',confirm:'أكّد إيميلك'}[mode];
- const passwordNeeded=['login','register','reset'].includes(mode),codeNeeded=['reset','confirm'].includes(mode);
- document.title=title+' | ريفو';
- $('app').innerHTML=`<main class="login-page"><section class="login-intro">${brand}<div><h1>كل عالمك الرقمي،<br><span>بحساب واحد.</span></h1><p>منتجاتك وطلباتك، بمكان واحد.<br>جاهز لجولتك الجاية؟</p></div><small>RIVO | عالمك الرقمي، على كيفك</small></section><section class="login-form-panel"><div class="login-card"><div class="login-icon">↗</div><h2>${title}</h2><p>${({register:'سجّل حسابك، وبنبعتلك رمز لتأكيد الإيميل.',login:'ادخل بإيميلك وكلمة مرور حساب ريفو.',forgot:'اكتب إيميلك لطلب رمز تغيير كلمة المرور.',reset:'اكتب الرمز اللي وصلك بالإيميل، واختار كلمة جديدة.',confirm:'اكتب رمز التأكيد اللي وصلك بالإيميل. افحص البريد غير المرغوب فيه أيضًا.'})[mode]}</p>${['login','register'].includes(mode)?'<button id="google-login" class="google-login" type="button"><span aria-hidden="true">G</span> متابعة باستخدام Google</button><div class="auth-divider">أو بالإيميل</div>':''}<form id="auth-form">${mode==='register'?'<label class="field">اسمك<input name="name" autocomplete="name" maxlength="100" required></label>':''}<label class="field">الإيميل<input name="email" type="email" dir="ltr" autocomplete="email" maxlength="254" value="${esc(initialEmail)}" placeholder="you@gmail.com" required></label>${codeNeeded?'<label class="field">رمز التحقق<input name="code" inputmode="numeric" autocomplete="one-time-code" dir="ltr" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required></label>':''}${passwordNeeded?`<label class="field">${mode==='reset'?'كلمة المرور الجديدة':'كلمة المرور'}<input id="auth-password" name="password" type="password" autocomplete="${mode==='login'?'current-password':'new-password'}" minlength="12" maxlength="128" dir="ltr" required><small>12 حرفًا على الأقل. استخدم كلمة مرور خاصة بريفو.</small></label><button id="toggle-password" class="link-btn" type="button">إظهار كلمة المرور</button>`:''}${['register','reset'].includes(mode)?'<label class="field">تأكيد كلمة المرور<input name="confirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" dir="ltr" required></label>':''}<div class="form-error" role="alert"></div><button class="primary" type="submit">${({register:'إنشاء حساب',login:'تسجيل الدخول',forgot:'إرسال رمز الاسترداد',reset:'حفظ كلمة المرور',confirm:'تأكيد الإيميل'})[mode]} ←</button></form>${codeNeeded?'<button id="resend-code" class="secondary" type="button">طلب رمز جديد</button>':''}<div class="auth-links">${mode==='login'?'<a href="/register">جديد على ريفو؟ أنشئ حسابك</a><a href="/recover">نسيت كلمة المرور؟</a><a href="/confirm">تأكيد الإيميل</a>':'<a href="/login">الرجوع لتسجيل الدخول</a>'}</div><a class="login-back" href="/">رجوع للمتجر ←</a></div></section></main>`;
- if($('google-login'))$('google-login').onclick=async()=>{const button=$('google-login');button.disabled=true;try{const r=await send('/api/auth/google','POST',{});location.assign(r.url)}catch(e){toast(e.message);button.disabled=false}};
- if(mode==='login'&&new URLSearchParams(location.search).has('oauth_error'))toast('لم يكتمل الدخول باستخدام Google، حاول مجددًا.');
- if(passwordNeeded)$('toggle-password').onclick=()=>{const p=$('auth-password');p.type=p.type==='password'?'text':'password';$('toggle-password').textContent=p.type==='password'?'إظهار كلمة المرور':'إخفاء كلمة المرور'};
- if(codeNeeded)$('resend-code').onclick=async()=>{const button=$('resend-code'),form=$('auth-form'),email=form.elements.email.value;if(!form.elements.email.reportValidity())return;button.disabled=true;try{const r=await send('/api/auth/'+(mode==='reset'?'forgot':'resend'),'POST',{email});toast(r.message)}catch(e){toast(e.message)}finally{setTimeout(()=>button.disabled=false,30000)}};
- bindForm('auth-form',async form=>{const values=Object.fromEntries(form);if(['register','reset'].includes(mode)&&values.password!==values.confirm)throw new Error('كلمتا المرور غير متطابقتين');delete values.confirm;const r=await send('/api/auth/'+mode,'POST',values);if(mode==='register'){login('confirm',values.email);toast('أكّد إيميلك بالرمز الموجود في الرسالة.')}else if(mode==='forgot'){login('reset',values.email);toast(r.message)}else if(mode==='reset'){history.replaceState({},'', '/login');login('login',values.email);toast('تم تغيير كلمة المرور، سجّل دخولك بالكلمة الجديدة.')}else location.assign(['owner','admin','support'].includes(r.user.role)?'/admin':'/account');});
+function closeEditor() {
+  $('editor').close();
 }
-document.addEventListener('click',async e=>{const link=e.target.closest('[data-logout]');if(!link)return;e.preventDefault();try{await send('/api/auth/logout','POST',{});location.assign('/login')}catch(err){toast(err.message)}});
-function customer(orders){const paid=orders.filter(o=>o.payment_status==='paid'&&o.status!=='cancelled');const list=orderTab==='purchases'?paid:orders;document.title='حسابي | ريفو';$('app').innerHTML=`<header class="customer-header"><div class="wrap topbar">${brand}<nav><a href="/">المتجر</a>${['owner','admin','support'].includes(user.role)?'<a href="/admin">لوحة الإدارة</a>':''}</nav><a class="store-login" href="/login" data-logout target="_top">تسجيل الخروج ←</a></div></header><main class="customer-wrap"><div class="customer-welcome"><div><h1>أهلًا ${esc(user.name.split(' ')[0])} 👋</h1><p>طلباتك ومشترياتك من ريفو، كلها هون.</p></div><a class="primary" href="/">تصفّح المتجر ←</a></div><div class="stats customer-stats">${stat('طلباتي',orders.length,'كل الطلبات')}${stat('مشترياتي',paid.length,'طلبات مدفوعة')}${stat('قيد المتابعة',orders.filter(o=>!['completed','cancelled'].includes(o.status)).length,'طلبات لم تكتمل')}</div><section class="panel"><div class="tabs"><button id="tab-all" class="${orderTab==='all'?'active':''}">كل الطلبات</button><button id="tab-purchases" class="${orderTab==='purchases'?'active':''}">المشتريات المدفوعة</button></div>${list.length?list.map(o=>`<div class="order-card"><div class="order-card-top"><code>#${o.id.slice(0,8)}</code><div>${o.payment_status.startsWith('test_')?'<span class="badge purple">اختبار مكتمل</span>':badge(o.status)} ${badge(o.payment_status)}</div></div>${o.items.map(x=>`<div class="order-item"><span>${esc(x.name)} × ${x.quantity}${x.region?' · '+esc(x.region):''}</span><b>${esc(money(x.unit_cents*x.quantity,o.currency))}</b></div>`).join('')}<div class="order-meta"><span>${date(o.created_at)}</span><span>${labels[o.payment_method]}</span><strong>الإجمالي ${esc(money(o.total_cents,o.currency))}</strong></div><a class="primary" href="/order.html?order=${encodeURIComponent(o.id)}">تفاصيل الطلب والتسليم ←</a>${o.payment_method==='gateway'?'<p><a class="primary" href="/payment.html?order='+encodeURIComponent(o.id)+'">مراجعة مبلغ وحالة الدفع بالدولار</a></p>':''}${o.customer_update?'<div class="customer-update"><strong>تحديث ريفو</strong><br>'+esc(o.customer_update)+'</div>':''}${o.payment_status!=='paid'&&o.payment_method==='whatsapp'?'<p class="small-note">فتح محادثة واتساب لا يؤكد الدفع. تظهر عملية الشراء بعد تأكيد الإدارة استلام المبلغ.</p>':''}</div>`).join(''):empty(orderTab==='purchases'?'لسه ما عندك مشتريات مدفوعة':'لسه ما عندك طلبات',orderTab==='purchases'?'بعد تأكيد الدفع، رح تلاقي المنتجات اللي اشتريتها هون.':'ابدأ بتصفّح المتجر واختار المنتج المناسب إلك.','<a class="primary" href="/">استكشف المنتجات</a>')}</section></main>`;$('tab-all').onclick=()=>{orderTab='all';customer(orders)};$('tab-purchases').onclick=()=>{orderTab='purchases';customer(orders)}}
-async function boot(){try{({user}=await api('/api/session'));const path=location.pathname;window.RivoChatNotifications?.start(user);if(!user){login();return}if(['/login','/register','/recover','/confirm'].includes(path)){location.replace(['owner','admin','support'].includes(user.role)?'/admin':'/account');return}if(path==='/admin'&&user.role==='support'){await supportView();return}if(path==='/admin'){if(!['owner','admin'].includes(user.role)){login();toast('هذا الحساب مخصص للزبون؛ يمكنك متابعة طلباتك من حسابي.');return}await refresh();window.addEventListener('hashchange',renderAdmin)}else{const r=await api('/api/orders');customer(r.orders)}}catch(e){$('app').innerHTML=empty('تعذّر تحميل الصفحة',esc(e.message),'<a class="primary" href="/login">حاول مجددًا</a>')}}
-$('editor').addEventListener('click',e=>{if(e.target===$('editor')){const r=$('editor').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeEditor()}});boot();
+function openEditor(html) {
+  $('editor-content').innerHTML = html;
+  $('editor').showModal();
+  $('editor-content').querySelector('[data-close]')?.addEventListener('click', closeEditor);
+}
+const editorHead = (t) =>
+  `<div class="editor-header"><h2>${t}</h2><button type="button" class="close" data-close aria-label="إغلاق">×</button></div>`;
+const field = (label, name, value = '', opts = {}) =>
+  `<label class="field ${opts.full ? 'full' : ''}">${label}<input name="${name}" value="${esc(value)}" ${opts.type ? `type="${opts.type}"` : ''} ${opts.required ? 'required' : ''} ${opts.min !== undefined ? `min="${opts.min}"` : ''} ${opts.step ? `step="${opts.step}"` : ''} maxlength="${opts.max || 500}" ${opts.placeholder ? `placeholder="${opts.placeholder}"` : ''}>${opts.help ? `<small>${opts.help}</small>` : ''}</label>`;
+const currencyChoices = [
+  ['ILS', 'شيكل ILS'],
+  ['JOD', 'دينار JOD'],
+  ['EGP', 'جنيه EGP'],
+  ['SAR', 'ريال SAR'],
+  ['AED', 'درهم AED'],
+  ['USD', 'دولار USD'],
+  ['TRY', 'ليرة TRY'],
+];
+const select = (label, name, value, choices, full = false) => {
+  if (name === 'currency') choices = currencyChoices;
+  return `<label class="field ${full ? 'full' : ''}">${label}<select name="${name}">${choices.map(([v, l]) => `<option value="${esc(v)}" ${v === value ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
+};
+function bindForm(id, save) {
+  const form = $(id);
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const error = form.querySelector('.form-error'),
+      button = form.querySelector('[type=submit]');
+    error.textContent = '';
+    button.disabled = true;
+    try {
+      await save(new FormData(form), form);
+    } catch (err) {
+      error.textContent = err.message;
+    } finally {
+      button.disabled = false;
+    }
+  };
+}
+const formEnd = (label) =>
+  `<div class="form-error" role="alert"></div><div class="form-actions"><button type="submit" class="primary">${label}</button><button class="secondary" type="button" onclick="closeEditor()">إلغاء</button></div>`;
+async function refresh() {
+  data = await api('/api/admin/overview');
+  renderAdmin();
+}
+let nav = [
+  ['overview', '⌘', 'نظرة عامة'],
+  ['products', '▦', 'المنتجات'],
+  ['orders', '▤', 'الطلبات'],
+  ['suppliers', '⇄', 'الموردون والربط'],
+  ['foxreload', '↗', 'FoxReload'],
+  ['policies', '≡', 'صفحات وسياسات المتجر'],
+  ['settings', '⚙', 'إعدادات المتجر'],
+];
+const allAdminNav = nav;
+function renderAdmin() {
+  nav = allAdminNav.filter(
+    (x) =>
+      x[0] === 'overview' ||
+      user.role === 'owner' ||
+      !user.permissions ||
+      user.permissions.includes(
+        {
+          products: 'products',
+          orders: 'orders_write',
+          suppliers: 'suppliers',
+          foxreload: 'suppliers',
+          settings: 'settings',
+          policies: 'policies',
+        }[x[0]],
+      ),
+  );
+  nav.push(['chat', '◌', 'محادثات الزبائن']);
+  if (user.role === 'owner') nav.push(['team', '♙', 'إدارة الفريق']);
+  current = location.hash.slice(1).split('?')[0] || 'overview';
+  if (!nav.some((x) => x[0] === current)) current = 'overview';
+  $('app').innerHTML =
+    `<div class="admin-shell"><aside class="sidebar">${brand}<div class="side-label">إدارة المتجر</div><nav>${nav.map(([key, icon, title]) => `<a class="side-link ${key === current ? 'active' : ''}" href="#${key}"><span class="ico">${icon}</span>${title}</a>`).join('')}</nav><div class="side-bottom"><a class="side-link" href="/">↗ معاينة المتجر</a><a class="side-link" href="/account">◇ حسابي كزبون</a><a class="side-link" href="/login" data-logout target="_top">← تسجيل الخروج</a></div><div class="side-profile"><b>${esc(user.name)}</b>${esc(user.email)} <span class="admin-chip">مدير</span></div></aside><main class="admin-main"><div class="dash-topbar"><div><h1>${nav.find((x) => x[0] === current)[2]}</h1><p>RIVO / لوحة الإدارة</p></div><div class="top-user"><span class="badge purple">حساب الإدارة</span><span class="avatar">${esc(user.name.slice(0, 1))}</span><a class="link-btn" href="/">المتجر ↗</a><a class="link-btn" target="_top" href="/login" data-logout>خروج</a></div></div><div class="dash-content" id="dash-view"></div></main></div>`;
+  ({
+    overview: overview,
+    products: productsView,
+    orders: ordersView,
+    suppliers: suppliersView,
+    foxreload: foxView,
+    chat: () => {
+      location.assign('/chat.html');
+    },
+    team: teamView,
+    settings: settingsView,
+    policies: () => RivoPolicies.render(),
+  })[current]();
+  window.RivoChatNotifications?.refresh();
+  if (current === 'overview') RivoAdminOrders.overviewAlerts();
+}
+function stat(title, value, note) {
+  return `<div class="stat"><span>${title}</span><strong>${value}</strong><small>${note}</small></div>`;
+}
+function overview() {
+  const paid = data.orders.filter((o) => o.payment_status === 'paid' && o.status !== 'cancelled');
+  const totals = {};
+  paid.forEach((o) => (totals[o.currency] = (totals[o.currency] || 0) + o.total_cents));
+  const revenue =
+    Object.entries(totals)
+      .map(([c, v]) => esc(money(v, c)))
+      .join(' / ') || '—';
+  $('dash-view').innerHTML =
+    `<div class="page-head"><div><h2>أهلًا في لوحة ريفو 👋</h2><p>منتجاتك وطلباتك وإعداداتك، في مكان واحد.</p></div><button class="primary" onclick="editProduct()">+ إضافة منتج</button></div><div class="stats">${stat('المنتجات المنشورة', data.products.filter((p) => p.status === 'active').length, 'من أصل ' + data.products.length + ' منتج')}${stat('الطلبات', data.orders.length, 'طلبات مسجلة فعلًا')}${stat('تحتاج متابعة', data.orders.filter((o) => !['completed', 'cancelled'].includes(o.status)).length, 'لم تكتمل بعد')}${stat('إجمالي التحصيل اليدوي', revenue, 'حسب الطلبات المؤكدة المعروضة')}</div><section id="admin-order-alerts" aria-label="طلبات تحتاج متابعة"></section><div class="welcome-panel"><div><h3>${data.products.length ? 'كل شيء تحت سيطرتك' : 'جاهز تضيف أول منتج؟'}</h3><p>اختار لكل منتج طريقة الطلب المناسبة: واتساب، بوابة الدفع، أو الطريقتين. المنتجات اللي تحفظها كمسودات بتظل مخفية عن الزبائن.</p></div><span class="welcome-art">✦</span></div><div class="two-col"><section class="panel"><div class="panel-head"><h3>آخر الطلبات</h3><a href="#orders">كل الطلبات ←</a></div>${data.orders.length ? orderTable(data.orders.slice(0, 5)) : empty('ما في طلبات بعد', 'لما ينشئ الزبون طلبًا، رح يظهر هون بحالته الحقيقية.')}</section><div><section class="panel"><h3>وصول سريع</h3><div class="quick-actions"><a href="#products">إدارة المنتجات <span>←</span></a><a href="#settings">رقم واتساب وبيانات المتجر <span>←</span></a><a href="#suppliers">تجهيز ربط الموردين <span>←</span></a></div></section><section class="panel"><h3>آخر النشاطات</h3>${
+      data.activity.length
+        ? data.activity
+            .slice(0, 5)
+            .map(
+              (a) =>
+                `<div class="activity">${esc({ product_created: 'إضافة منتج', product_updated: 'تعديل منتج', product_archived: 'أرشفة منتج', product_deleted: 'حذف منتج', products_published: 'نشر منتجات', products_deleted: 'حذف منتجات', settings_updated: 'تحديث إعدادات المتجر', supplier_created: 'إضافة مورد', supplier_updated: 'تعديل مورد', products_imported: 'استيراد منتجات', order_updated: 'تحديث طلب' }[a.action] || a.action)} · ${esc(a.target.slice(0, 45))}<small>${date(a.created_at)}</small></div>`,
+            )
+            .join('')
+        : '<p class="helper">تظهر هنا التغييرات بعد أول عملية حفظ.</p>'
+    }</section></div></div>`;
+}
+function visibleProducts() {
+  return data.products.filter(
+    (p) =>
+      (filter === 'all' || p.status === filter) &&
+      `${p.name} ${p.slug} ${p.category}`.toLowerCase().includes(search.toLowerCase()),
+  );
+}
+function productRows() {
+  const list = visibleProducts(),
+    allSelected = list.length > 0 && list.every((p) => selectedProducts.has(p.id));
+  $('product-bulk').innerHTML =
+    `<span class="helper">تم تحديد ${selectedProducts.size} منتج</span><button class="primary" id="bulk-publish" ${selectedProducts.size ? '' : 'disabled'}>نشر المحدد</button><button class="danger" id="bulk-delete" ${selectedProducts.size ? '' : 'disabled'}>حذف المحدد</button>`;
+  $('product-table').innerHTML = list.length
+    ? `<div class="table-wrap"><table><thead><tr><th><input id="select-all-products" type="checkbox" aria-label="تحديد كل المنتجات الظاهرة" ${allSelected ? 'checked' : ''}></th><th>المنتج</th><th>التصنيف</th><th>السعر</th><th>طريقة الطلب</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>${list.map((p) => `<tr><td><input class="product-select" type="checkbox" data-product-id="${p.id}" aria-label="تحديد ${esc(p.name)}" ${selectedProducts.has(p.id) ? 'checked' : ''}></td><td><div class="table-product"><span class="mini-cover">${p.image_url ? `<img src="${esc(p.image_url)}" alt="">` : esc(p.name.slice(0, 2))}</span><div><b>${esc(p.name)}</b><small>${esc(p.slug)}</small></div></div></td><td>${esc(p.category)}</td><td>${esc(money(p.price_cents, p.currency))}</td><td>${badge(p.payment_mode)}</td><td>${badge(p.status)}</td><td><div class="row-actions"><button onclick="editProduct('${p.id}')">تعديل</button>${p.status !== 'archived' ? `<button onclick="archiveProduct('${p.id}')">أرشفة</button>` : ''}<button class="danger" onclick="deleteProduct('${p.id}')">حذف</button></div></td></tr>`).join('')}</tbody></table></div>`
+    : empty('ما في منتجات مطابقة', 'جرّب تغيير البحث أو أضف منتجك الأول.');
+  $('bulk-publish').onclick = () => bulkProductAction('publish');
+  $('bulk-delete').onclick = () => bulkProductAction('delete');
+  $('select-all-products')?.addEventListener('change', (e) => {
+    for (const p of list)
+      e.target.checked ? selectedProducts.add(p.id) : selectedProducts.delete(p.id);
+    productRows();
+  });
+  document.querySelectorAll('.product-select').forEach(
+    (box) =>
+      (box.onchange = () => {
+        box.checked
+          ? selectedProducts.add(box.dataset.productId)
+          : selectedProducts.delete(box.dataset.productId);
+        productRows();
+      }),
+  );
+}
+function productsView() {
+  search = '';
+  filter = 'all';
+  selectedProducts = new Set();
+  $('dash-view').innerHTML =
+    `<div class="page-head"><div><h2>منتجات ريفو</h2><p>أضف، عدّل، وانشر منتجاتك بطريقتك.</p></div><button class="primary" onclick="editProduct()">+ إضافة منتج</button></div><section class="panel"><div class="toolbar"><input id="product-search" aria-label="ابحث عن منتج" placeholder="ابحث بالاسم أو رابط المنتج…"><select id="product-filter" aria-label="حالة المنتج"><option value="all">كل الحالات</option><option value="active">منشور</option><option value="draft">مسودة</option><option value="archived">مؤرشف</option></select></div><div class="toolbar" id="product-bulk"></div><div id="product-table"></div></section>`;
+  productRows();
+  $('product-search').oninput = (e) => {
+    search = e.target.value;
+    productRows();
+  };
+  $('product-filter').onchange = (e) => {
+    filter = e.target.value;
+    productRows();
+  };
+}
+function bulkProductAction(action) {
+  const ids = [...selectedProducts];
+  if (!ids.length) return;
+  const deleting = action === 'delete';
+  openEditor(
+    `${editorHead(deleting ? 'حذف المنتجات المحددة' : 'نشر المنتجات المحددة')}<div class="${deleting ? 'warning-box' : 'info-box'}">${deleting ? 'سيتم حذف ' + ids.length + ' منتجًا نهائيًا. إذا كان أي منتج مرتبطًا بطلب سابق، لن يُحذف أي منتج من المجموعة.' : 'سيتم نشر ' + ids.length + ' منتجًا ليظهر للزبائن في المتجر.'}</div><form id="bulk-products-form">${formEnd(deleting ? 'حذف المحدد نهائيًا' : 'نشر المحدد')}</form>`,
+  );
+  bindForm('bulk-products-form', async () => {
+    const r = await send('/api/admin/products/bulk', 'POST', { action, ids });
+    selectedProducts.clear();
+    closeEditor();
+    await refresh();
+    toast(deleting ? 'تم حذف ' + r.count + ' منتجًا' : 'تم نشر ' + r.count + ' منتجًا');
+  });
+}
+function editProduct(id) {
+  const p = data.products.find((p) => p.id === id) || {
+    name: '',
+    slug: '',
+    category: 'شحن الألعاب',
+    price_cents: 0,
+    currency: data.settings.currency,
+    status: 'draft',
+    payment_mode: 'whatsapp',
+    sort_order: 0,
+  };
+  openEditor(
+    `${editorHead(id ? 'تعديل المنتج' : 'منتج جديد')}<form id="product-form"><div class="form-grid">${field('اسم المنتج', 'name', p.name, { required: true, max: 120 })}${field('رابط المنتج (slug)', 'slug', p.slug, { required: true, max: 100, placeholder: 'pubg-60-uc', help: 'أحرف إنجليزية صغيرة وأرقام وشرطات فقط.' })}${field('التصنيف', 'category', p.category, { required: true, max: 80 })}${field('المنطقة أو الدولة', 'region', p.region, { max: 100, placeholder: 'عالمي، US، فلسطين…' })}${field('السعر', 'price', (p.price_cents / 100).toFixed(2), { type: 'number', min: 0, step: '0.01', required: true })}${select(
+      'العملة',
+      'currency',
+      p.currency,
+      [
+        ['USD', 'دولار USD'],
+        ['ILS', 'شيكل ILS'],
+        ['JOD', 'دينار JOD'],
+      ],
+    )}<label class="field full">وصف المنتج<textarea name="description" maxlength="3000">${esc(p.description)}</textarea></label><label class="field full">وقت التنفيذ المتوقع<input name="delivery_estimate" value="${esc(p.delivery_estimate)}" maxlength="200" placeholder="مثال: خلال ساعات العمل بعد تأكيد الدفع"><small>اكتب المدة الفعلية لهذا المنتج؛ لا تظهر وعود زمنية تلقائية.</small></label><label class="field full">تعليمات التفعيل<textarea name="activation_instructions" maxlength="3000" placeholder="اكتب خطوات استخدام الكود أو الشحن، كل خطوة بسطر…">${esc(p.activation_instructions)}</textarea><small>تعليمات عامة تظهر قبل الشراء وبعده. لا تضع أكوادًا فعلية أو بيانات سرية هنا.</small></label><label class="field full">تنبيه قبل الشراء<textarea name="purchase_notice" maxlength="1500" placeholder="مثال: تأكد من تطابق منطقة حسابك مع البطاقة.">${esc(p.purchase_notice)}</textarea><small>وضّح القيود الخاصة بالمنتج. هذا الحقل ليس بديلًا عن سياسة المتجر.</small></label>${select(
+      'طريقة الطلب',
+      'payment_mode',
+      p.payment_mode,
+      [
+        ['whatsapp', 'طلب عبر واتساب'],
+        ['gateway', 'الدفع ببوابة الدفع'],
+        ['both', 'واتساب أو بوابة الدفع'],
+      ],
+      true,
+    )}<div class="info-box field full">الدفع عبر Payunit بالدولار عند تهيئة المفاتيح. الوضع التجريبي متاح لحساب الإدارة فقط. لا تُعتبر محادثة واتساب إثبات دفع.</div>${field('رابط صورة المنتج', 'image_url', p.image_url, { full: true, max: 1000, placeholder: 'https://… أو ارفع صورة أدناه' })}<label class="field full">أو ارفع صورة<input class="file-input" id="image-file" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG أو JPG أو WebP، حتى 4 ميجابايت.</small><span id="upload-state"></span></label>${select(
+      'حالة النشر',
+      'status',
+      p.status,
+      [
+        ['draft', 'مسودة'],
+        ['active', 'منشور'],
+        ['archived', 'مؤرشف'],
+      ],
+    )}${field('ترتيب العرض', 'sort_order', p.sort_order, { type: 'number', min: 0, step: 1 })}<label class="check-field field full"><span><input type="checkbox" name="player_id_required" ${p.player_id_required ? 'checked' : ''}> يتطلب معرّف اللاعب عند الطلب</span></label>${select('مصدر المنتج / المورد', 'supplier_id', p.supplier_id || '', [['', 'إضافة يدوية'], ...data.suppliers.map((s) => [s.id, s.name])])}${field('معرّف المنتج لدى المورد', 'supplier_product_id', p.supplier_product_id, { max: 150 })}</div>${formEnd('حفظ المنتج')}</form>`,
+  );
+  const form = $('product-form');
+  $('image-file').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const submit = form.querySelector('[type=submit]');
+    submit.disabled = true;
+    try {
+      $('upload-state').textContent = 'جاري رفع الصورة…';
+      const r = await api('/api/admin/upload', {
+        method: 'POST',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+      form.elements.image_url.value = r.url;
+      $('upload-state').textContent = 'تم رفع الصورة';
+    } catch (err) {
+      $('upload-state').textContent = err.message;
+    } finally {
+      submit.disabled = false;
+    }
+  };
+  bindForm('product-form', async (fd) => {
+    const value = Object.fromEntries(fd);
+    const payload = {
+      ...value,
+      price_cents: Math.round(Number(value.price) * 100),
+      sort_order: Number(value.sort_order),
+      player_id_required: fd.has('player_id_required'),
+    };
+    await send(
+      id ? '/api/admin/products/' + id : '/api/admin/products',
+      id ? 'PUT' : 'POST',
+      payload,
+    );
+    closeEditor();
+    await refresh();
+    toast('تم حفظ المنتج');
+  });
+}
+function archiveProduct(id) {
+  const p = data.products.find((p) => p.id === id);
+  openEditor(
+    `${editorHead('أرشفة المنتج')}<p class="helper">إخفاء «${esc(p.name)}» من المتجر؟ تظل الطلبات السابقة محفوظة، ويمكن إعادة نشر المنتج من صفحة التعديل.</p><form id="archive-form">${formEnd('أرشفة المنتج')}</form>`,
+  );
+  bindForm('archive-form', async () => {
+    await api('/api/admin/products/' + id, { method: 'DELETE' });
+    closeEditor();
+    await refresh();
+    toast('تمت أرشفة المنتج');
+  });
+}
+function deleteProduct(id) {
+  const p = data.products.find((p) => p.id === id);
+  openEditor(
+    `${editorHead('حذف المنتج نهائيًا')}<div class="warning-box">سيتم حذف «${esc(p.name)}» من قائمة المنتجات نهائيًا. لا يمكن التراجع عن هذه العملية.</div><p class="helper">إذا كان المنتج مرتبطًا بطلب سابق، سيمنع النظام الحذف ويطلب منك أرشفته بدلًا من ذلك حفاظًا على سجل الطلب.</p><form id="delete-product-form">${formEnd('حذف نهائي')}</form>`,
+  );
+  bindForm('delete-product-form', async () => {
+    await api('/api/admin/products/' + id + '/permanent', { method: 'DELETE' });
+    closeEditor();
+    await refresh();
+    toast('تم حذف المنتج نهائيًا');
+  });
+}
+function orderTable(orders) {
+  return RivoAdminOrders.table(orders);
+}
+function ordersView() {
+  RivoAdminOrders.render();
+}
+async function editOrder(id) {
+  let o;
+  try {
+    ({ order: o } = await api('/api/admin/orders/' + id));
+  } catch (e) {
+    toast(e.message);
+    return;
+  }
+  const oldIndex = data.orders.findIndex((x) => x.id === id);
+  if (oldIndex >= 0) data.orders[oldIndex] = o;
+  else data.orders.push(o);
+  openEditor(
+    `${editorHead('طلب #' + o.id.slice(0, 8))}<p class="helper">${esc(o.customer_name)} · ${esc(o.customer_email)}<br>${date(o.created_at)}</p>${RivoAdminOrders.extra(o)}<div class="info-box">${o.items.map((x) => `${esc(x.name)} × ${x.quantity} — ${esc(x.region)} — ${esc(money(x.unit_cents * x.quantity, o.currency))}${x.player_id ? '<br>معرّف الحساب لهذا المنتج: <bdi>' + esc(x.player_id) + '</bdi>' + (x.input_source === 'legacy' ? ' (مشترك من طلب قديم)' : '') : ''}`).join('<br>')}<br><strong>الإجمالي: ${esc(money(o.total_cents, o.currency))}</strong>${o.player_id ? '<br>معرّف اللاعب: ' + esc(o.player_id) : ''}${o.customer_note ? '<br>ملاحظة الزبون: ' + esc(o.customer_note) : ''}</div><form id="order-form"><div class="form-grid">${select(
+      'حالة التنفيذ',
+      'status',
+      o.status,
+      ['contact_pending', 'awaiting_payment', 'processing', 'completed', 'cancelled'].map((v) => [
+        v,
+        labels[v],
+      ]),
+    )}${select('حالة الدفع (تأكيد يدوي)', 'payment_status', o.payment_status, [
+      ['unpaid', 'لم يتم تحصيل الدفع'],
+      ['paid', 'تم تأكيد استلام الدفع'],
+      ['refunded', 'مسترجع'],
+      ['partially_refunded', 'استرجاع جزئي'],
+      ['test_paid', 'دفع تجريبي'],
+      ['test_refunded', 'استرجاع تجريبي'],
+      ['test_partially_refunded', 'استرجاع جزئي تجريبي'],
+    ])}<label class="field full">تحديث للزبون<textarea name="customer_update" maxlength="2000" placeholder="مثال: تم استلام طلبك ونعمل على تنفيذه…">${esc(o.customer_update)}</textarea><small>هذا النص يظهر للزبون في حسابه. تجنّب إدخال مفاتيح أو بيانات خاصة بمتجر آخر.</small></label><label class="field full">ملاحظة داخلية للإدارة<textarea name="admin_note" maxlength="2000">${esc(o.admin_note)}</textarea><small>لا تظهر للزبون.</small></label></div><p class="warning-box">اختر «مدفوع» فقط بعد التحقق من استلام المبلغ فعليًا. فتح واتساب أو إرسال الرسالة لا يؤكد الدفع. إكمال الطلب يتطلب حالة دفع مؤكدة.</p>${formEnd('حفظ تحديث الطلب')}</form><button class="secondary" type="button" onclick="foxOrder('${id}')">تنفيذ / متابعة منتجات FoxReload</button>`,
+  );
+  if (o.payment_method === 'gateway') {
+    const field = $('order-form').elements.namedItem('payment_status');
+    field.disabled = true;
+    field.closest('label').firstChild.textContent = 'حالة الدفع (تُحدّث من Payunit)';
+  }
+  bindForm('order-form', async (fd) => {
+    const values = Object.fromEntries(fd);
+    if (o.payment_method === 'gateway') values.payment_status = o.payment_status;
+    await send('/api/admin/orders/' + id, 'PUT', values);
+    closeEditor();
+    await refresh();
+    toast('تم تحديث الطلب');
+  });
+}
+function suppliersView() {
+  $('dash-view').innerHTML =
+    `<div class="info-box">ربط FoxReload متاح من <a href="#foxreload">شاشة FoxReload ←</a></div><div class="page-head"><div><h2>الموردون والربط</h2><p>جهّز مصادر المنتجات وربط المعرّفات، ثم فعّل موائم API عند توفر وثائق المورد.</p></div><button class="primary" onclick="newSupplier()">+ إضافة مورد</button></div><div class="info-box">الربط التلقائي بواجهات الموردين يحتاج موائمًا مطابقًا لوثائق كل مورد. حاليًا يمكنك تسجيل المورد واستيراد كتالوجه بصيغة JSON كمسودات تراجعها قبل النشر.</div><div class="two-col"><section class="panel"><div class="panel-head"><h3>الموردون المسجلون</h3><span class="badge">${data.suppliers.length}</span></div>${data.suppliers.length ? data.suppliers.map((s) => `<div class="supplier-card"><div><h3>${esc(s.name)}</h3><p class="mono">${esc(s.base_url || 'لم يُضف رابط')}</p><p>${esc(s.notes)}</p>${s.secret_name ? '<small>متغير المفتاح: <code>' + esc(s.secret_name) + '</code></small>' : ''}</div><div><span class="badge yellow">بانتظار موائم API</span><button class="text-btn" onclick="newSupplier('${s.id}')">تعديل</button></div></div>`).join('') : empty('أضف المورد الأول', 'اربط معرّفات منتجاتك بمصدرها، دون تخزين مفاتيح API في صفحات الموقع.')}</section><section class="panel"><h3>استيراد كتالوج</h3><p class="helper">ارفع JSON بالتنسيق الموضّح في النموذج. سيتم إنشاء المنتجات كمسودات فقط، مع مراجعة الأسماء والأسعار وطرق الطلب قبل نشرها.</p><div class="quick-actions"><button class="secondary" onclick="downloadTemplate()">تنزيل نموذج JSON</button><button class="primary" onclick="importCatalog()">استيراد منتجات JSON</button></div><div class="small-note">حتى 100 منتج لكل دفعة. لا تُنفّذ طلبات أو مدفوعات لدى المورد من هذه الشاشة.</div></section></div>`;
+}
+function newSupplier(id) {
+  const s = data.suppliers.find((x) => x.id === id) || {};
+  openEditor(
+    `${editorHead(id ? 'تعديل المورد' : 'إضافة مورد')}<form id="supplier-form"><div class="form-grid">${field('اسم المورد', 'name', s.name || '', { required: true, max: 100, full: true })}${field('رابط API الأساسي', 'base_url', s.base_url || '', { type: 'url', max: 500, full: true, placeholder: 'https://api.supplier.example/' })}${field('اسم متغير مفتاح API', 'secret_name', s.secret_name || '', { max: 80, full: true, placeholder: 'SUPPLIER_API_KEY', help: 'اسم المتغير فقط، وليس قيمة المفتاح. تتم إضافة القيمة بأمان ضمن إعدادات الخادم عند الربط.' })}<label class="field full">ملاحظات<textarea name="notes" maxlength="1000" placeholder="رابط الوثائق، العملة، آلية الكتالوج…">${esc(s.notes)}</textarea></label></div>${formEnd('حفظ المورد')}</form>`,
+  );
+  bindForm('supplier-form', async (fd) => {
+    await send(
+      id ? '/api/admin/suppliers/' + id : '/api/admin/suppliers',
+      id ? 'PUT' : 'POST',
+      Object.fromEntries(fd),
+    );
+    closeEditor();
+    await refresh();
+    toast('تم تسجيل المورد');
+  });
+}
+function downloadTemplate() {
+  const example = {
+    products: [
+      {
+        name: 'اسم المنتج',
+        slug: 'example-product',
+        category: 'بطاقات رقمية',
+        description: 'وصف الفئة والمنطقة وشروط الاستخدام',
+        price_cents: 1000,
+        currency: 'USD',
+        image_url: '',
+        payment_mode: 'whatsapp',
+        region: 'US',
+        player_id_required: false,
+        supplier_product_id: 'SKU-001',
+        sort_order: 0,
+      },
+    ],
+  };
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(example, null, 2)], { type: 'application/json' }),
+  );
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'rivo-catalog-template.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importCatalog() {
+  openEditor(
+    `${editorHead('استيراد منتجات كمسودات')}<form id="import-form"><div class="form-grid">${select('المورد', 'supplier_id', '', [['', 'استيراد يدوي'], ...data.suppliers.map((s) => [s.id, s.name])], true)}<label class="field full">ملف JSON<input type="file" id="catalog-file" accept="application/json,.json" required></label></div><p class="helper" id="import-preview">اختَر الملف لمراجعة عدد المنتجات وأسمائها قبل الاستيراد.</p>${formEnd('تأكيد استيراد المسودات')}</form>`,
+  );
+  let payload = null;
+  $('catalog-file').onchange = async (e) => {
+    payload = null;
+    try {
+      const f = e.target.files[0];
+      if (f.size > 180000) throw new Error('حجم الملف كبير؛ الحد 180 كيلوبايت');
+      const raw = JSON.parse(await f.text());
+      const list = Array.isArray(raw) ? raw : raw.products;
+      if (!Array.isArray(list) || !list.length || list.length > 100)
+        throw new Error('يجب أن يحتوي الملف على 1–100 منتج');
+      payload = list;
+      $('import-preview').textContent =
+        'سيتم استيراد ' +
+        list.length +
+        ' منتجًا كمسودات: ' +
+        list
+          .slice(0, 8)
+          .map((x) => x.name)
+          .join('، ');
+    } catch (err) {
+      $('import-preview').textContent = err.message;
+    }
+  };
+  bindForm('import-form', async (fd) => {
+    if (!payload) throw new Error('اختر ملفًا صالحًا أولًا');
+    const r = await send('/api/admin/import', 'POST', {
+      supplier_id: fd.get('supplier_id'),
+      products: payload,
+    });
+    closeEditor();
+    await refresh();
+    toast('تم استيراد ' + r.count + ' منتجًا كمسودات');
+  });
+}
+function settingsView() {
+  const s = data.settings;
+  $('dash-view').innerHTML =
+    `<div class="page-head"><div><h2>إعدادات المتجر</h2><p>حدّث ظهور الموقع وبيانات التواصل من مكان واحد.</p></div></div><form id="settings-form"><section class="panel"><h3>معلومات المتجر والواجهة الرئيسية</h3><div class="form-grid">${field('اسم المتجر', 'storeName', s.storeName, { required: true, max: 180 })}${field('الشعار النصي', 'tagline', s.tagline, { max: 180 })}${field('عنوان الهيرو', 'heroTitle', s.heroTitle, { max: 180 })}${field('النص المميز في الهيرو', 'heroAccent', s.heroAccent, { max: 180 })}<label class="field full">وصف الهيرو<textarea name="heroDescription" maxlength="600">${esc(s.heroDescription)}</textarea></label>${field('شريط الإعلان', 'announcement', s.announcement, { full: true, max: 180 })}</div></section><section class="panel"><h3>التواصل والطلبات</h3><div class="form-grid">${field('رقم واتساب المتجر', 'whatsapp', s.whatsapp, { max: 20, placeholder: '970xxxxxxxxx', help: 'أرقام فقط مع مفتاح الدولة، دون + أو مسافات. يفتح الزبون المحادثة ويرسل الرسالة بنفسه.' })}${field('حساب إنستغرام', 'instagram', s.instagram, { max: 180, placeholder: 'rivoo.ps' })}${select(
+      'عملة افتراضية للمنتجات الجديدة',
+      'currency',
+      s.currency,
+      [
+        ['USD', 'دولار USD'],
+        ['ILS', 'شيكل ILS'],
+        ['JOD', 'دينار JOD'],
+      ],
+    )}${field('اسم بوابة الدفع الظاهر', 'gatewayLabel', s.gatewayLabel, { max: 180 })}</div><div class="warning-box" style="margin-top:18px">حالة Payunit: ${data.gatewayReady ? 'المفاتيح مهيأة' : 'المفاتيح غير مهيأة'}. تُضبط مفاتيح البوابة ووضع test أو live في Cloudflare. تغيير الاسم هنا لا يغيّر إعدادات الاتصال.</div></section><div class="form-error" role="alert"></div><button class="primary" type="submit">حفظ الإعدادات</button></form>`;
+  bindForm('settings-form', async (fd) => {
+    await send('/api/admin/settings', 'PUT', Object.fromEntries(fd));
+    await refresh();
+    toast('تم تحديث إعدادات المتجر');
+  });
+}
+function login(forcedMode, initialEmail = '') {
+  const mode =
+    forcedMode ||
+    { '/register': 'register', '/recover': 'forgot', '/confirm': 'confirm' }[location.pathname] ||
+    'login';
+  const title = {
+    register: 'خلّينا نتعرّف عليك',
+    login: 'أهلًا برجعتك',
+    forgot: 'نسيت كلمة المرور؟',
+    reset: 'كلمة مرور جديدة',
+    confirm: 'أكّد إيميلك',
+  }[mode];
+  const passwordNeeded = ['login', 'register', 'reset'].includes(mode),
+    codeNeeded = ['reset', 'confirm'].includes(mode);
+  document.title = title + ' | ريفو';
+  $('app').innerHTML =
+    `<main class="login-page"><section class="login-intro">${brand}<div><h1>كل عالمك الرقمي،<br><span>بحساب واحد.</span></h1><p>منتجاتك وطلباتك، بمكان واحد.<br>جاهز لجولتك الجاية؟</p></div><small>RIVO | عالمك الرقمي، على كيفك</small></section><section class="login-form-panel"><div class="login-card"><div class="login-icon">↗</div><h2>${title}</h2><p>${{ register: 'سجّل حسابك، وبنبعتلك رمز لتأكيد الإيميل.', login: 'ادخل بإيميلك وكلمة مرور حساب ريفو.', forgot: 'اكتب إيميلك لطلب رمز تغيير كلمة المرور.', reset: 'اكتب الرمز اللي وصلك بالإيميل، واختار كلمة جديدة.', confirm: 'اكتب رمز التأكيد اللي وصلك بالإيميل. افحص البريد غير المرغوب فيه أيضًا.' }[mode]}</p>${['login', 'register'].includes(mode) ? '<button id="google-login" class="google-login" type="button"><span aria-hidden="true">G</span> متابعة باستخدام Google</button><div class="auth-divider">أو بالإيميل</div>' : ''}<form id="auth-form">${mode === 'register' ? '<label class="field">اسمك<input name="name" autocomplete="name" maxlength="100" required></label>' : ''}<label class="field">الإيميل<input name="email" type="email" dir="ltr" autocomplete="email" maxlength="254" value="${esc(initialEmail)}" placeholder="you@gmail.com" required></label>${codeNeeded ? '<label class="field">رمز التحقق<input name="code" inputmode="numeric" autocomplete="one-time-code" dir="ltr" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required></label>' : ''}${passwordNeeded ? `<label class="field">${mode === 'reset' ? 'كلمة المرور الجديدة' : 'كلمة المرور'}<input id="auth-password" name="password" type="password" autocomplete="${mode === 'login' ? 'current-password' : 'new-password'}" minlength="12" maxlength="128" dir="ltr" required><small>12 حرفًا على الأقل. استخدم كلمة مرور خاصة بريفو.</small></label><button id="toggle-password" class="link-btn" type="button">إظهار كلمة المرور</button>` : ''}${['register', 'reset'].includes(mode) ? '<label class="field">تأكيد كلمة المرور<input name="confirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" dir="ltr" required></label>' : ''}<div class="form-error" role="alert"></div><button class="primary" type="submit">${{ register: 'إنشاء حساب', login: 'تسجيل الدخول', forgot: 'إرسال رمز الاسترداد', reset: 'حفظ كلمة المرور', confirm: 'تأكيد الإيميل' }[mode]} ←</button></form>${codeNeeded ? '<button id="resend-code" class="secondary" type="button">طلب رمز جديد</button>' : ''}<div class="auth-links">${mode === 'login' ? '<a href="/register">جديد على ريفو؟ أنشئ حسابك</a><a href="/recover">نسيت كلمة المرور؟</a><a href="/confirm">تأكيد الإيميل</a>' : '<a href="/login">الرجوع لتسجيل الدخول</a>'}</div><a class="login-back" href="/">رجوع للمتجر ←</a></div></section></main>`;
+  if ($('google-login'))
+    $('google-login').onclick = async () => {
+      const button = $('google-login');
+      button.disabled = true;
+      try {
+        const r = await send('/api/auth/google', 'POST', {});
+        location.assign(r.url);
+      } catch (e) {
+        toast(e.message);
+        button.disabled = false;
+      }
+    };
+  if (mode === 'login' && new URLSearchParams(location.search).has('oauth_error'))
+    toast('لم يكتمل الدخول باستخدام Google، حاول مجددًا.');
+  if (passwordNeeded)
+    $('toggle-password').onclick = () => {
+      const p = $('auth-password');
+      p.type = p.type === 'password' ? 'text' : 'password';
+      $('toggle-password').textContent =
+        p.type === 'password' ? 'إظهار كلمة المرور' : 'إخفاء كلمة المرور';
+    };
+  if (codeNeeded)
+    $('resend-code').onclick = async () => {
+      const button = $('resend-code'),
+        form = $('auth-form'),
+        email = form.elements.email.value;
+      if (!form.elements.email.reportValidity()) return;
+      button.disabled = true;
+      try {
+        const r = await send('/api/auth/' + (mode === 'reset' ? 'forgot' : 'resend'), 'POST', {
+          email,
+        });
+        toast(r.message);
+      } catch (e) {
+        toast(e.message);
+      } finally {
+        setTimeout(() => (button.disabled = false), 30000);
+      }
+    };
+  bindForm('auth-form', async (form) => {
+    const values = Object.fromEntries(form);
+    if (['register', 'reset'].includes(mode) && values.password !== values.confirm)
+      throw new Error('كلمتا المرور غير متطابقتين');
+    delete values.confirm;
+    const r = await send('/api/auth/' + mode, 'POST', values);
+    if (mode === 'register') {
+      login('confirm', values.email);
+      toast('أكّد إيميلك بالرمز الموجود في الرسالة.');
+    } else if (mode === 'forgot') {
+      login('reset', values.email);
+      toast(r.message);
+    } else if (mode === 'reset') {
+      history.replaceState({}, '', '/login');
+      login('login', values.email);
+      toast('تم تغيير كلمة المرور، سجّل دخولك بالكلمة الجديدة.');
+    } else
+      location.assign(['owner', 'admin', 'support'].includes(r.user.role) ? '/admin' : '/account');
+  });
+}
+document.addEventListener('click', async (e) => {
+  const link = e.target.closest('[data-logout]');
+  if (!link) return;
+  e.preventDefault();
+  try {
+    await send('/api/auth/logout', 'POST', {});
+    location.assign('/login');
+  } catch (err) {
+    toast(err.message);
+  }
+});
+function customer(orders) {
+  const paid = orders.filter((o) => o.payment_status === 'paid' && o.status !== 'cancelled');
+  const list = orderTab === 'purchases' ? paid : orders;
+  document.title = 'حسابي | ريفو';
+  $('app').innerHTML =
+    `<header class="customer-header"><div class="wrap topbar">${brand}<nav><a href="/">المتجر</a>${['owner', 'admin', 'support'].includes(user.role) ? '<a href="/admin">لوحة الإدارة</a>' : ''}</nav><a class="store-login" href="/login" data-logout target="_top">تسجيل الخروج ←</a></div></header><main class="customer-wrap"><div class="customer-welcome"><div><h1>أهلًا ${esc(user.name.split(' ')[0])} 👋</h1><p>طلباتك ومشترياتك من ريفو، كلها هون.</p></div><a class="primary" href="/">تصفّح المتجر ←</a></div><div class="stats customer-stats">${stat('طلباتي', orders.length, 'كل الطلبات')}${stat('مشترياتي', paid.length, 'طلبات مدفوعة')}${stat('قيد المتابعة', orders.filter((o) => !['completed', 'cancelled'].includes(o.status)).length, 'طلبات لم تكتمل')}</div><section class="panel"><div class="tabs"><button id="tab-all" class="${orderTab === 'all' ? 'active' : ''}">كل الطلبات</button><button id="tab-purchases" class="${orderTab === 'purchases' ? 'active' : ''}">المشتريات المدفوعة</button></div>${list.length ? list.map((o) => `<div class="order-card"><div class="order-card-top"><code>#${o.id.slice(0, 8)}</code><div>${o.payment_status.startsWith('test_') ? '<span class="badge purple">اختبار مكتمل</span>' : badge(o.status)} ${badge(o.payment_status)}</div></div>${o.items.map((x) => `<div class="order-item"><span>${esc(x.name)} × ${x.quantity}${x.region ? ' · ' + esc(x.region) : ''}</span><b>${esc(money(x.unit_cents * x.quantity, o.currency))}</b></div>`).join('')}<div class="order-meta"><span>${date(o.created_at)}</span><span>${labels[o.payment_method]}</span><strong>الإجمالي ${esc(money(o.total_cents, o.currency))}</strong></div><a class="primary" href="/order.html?order=${encodeURIComponent(o.id)}">تفاصيل الطلب والتسليم ←</a>${o.payment_method === 'gateway' ? '<p><a class="primary" href="/payment.html?order=' + encodeURIComponent(o.id) + '">مراجعة مبلغ وحالة الدفع بالدولار</a></p>' : ''}${o.customer_update ? '<div class="customer-update"><strong>تحديث ريفو</strong><br>' + esc(o.customer_update) + '</div>' : ''}${o.payment_status !== 'paid' && o.payment_method === 'whatsapp' ? '<p class="small-note">فتح محادثة واتساب لا يؤكد الدفع. تظهر عملية الشراء بعد تأكيد الإدارة استلام المبلغ.</p>' : ''}</div>`).join('') : empty(orderTab === 'purchases' ? 'لسه ما عندك مشتريات مدفوعة' : 'لسه ما عندك طلبات', orderTab === 'purchases' ? 'بعد تأكيد الدفع، رح تلاقي المنتجات اللي اشتريتها هون.' : 'ابدأ بتصفّح المتجر واختار المنتج المناسب إلك.', '<a class="primary" href="/">استكشف المنتجات</a>')}</section></main>`;
+  $('tab-all').onclick = () => {
+    orderTab = 'all';
+    customer(orders);
+  };
+  $('tab-purchases').onclick = () => {
+    orderTab = 'purchases';
+    customer(orders);
+  };
+}
+async function boot() {
+  try {
+    ({ user } = await api('/api/session'));
+    const path = location.pathname;
+    window.RivoChatNotifications?.start(user);
+    if (!user) {
+      login();
+      return;
+    }
+    if (['/login', '/register', '/recover', '/confirm'].includes(path)) {
+      location.replace(['owner', 'admin', 'support'].includes(user.role) ? '/admin' : '/account');
+      return;
+    }
+    if (path === '/admin' && user.role === 'support') {
+      await supportView();
+      return;
+    }
+    if (path === '/admin') {
+      if (!['owner', 'admin'].includes(user.role)) {
+        login();
+        toast('هذا الحساب مخصص للزبون؛ يمكنك متابعة طلباتك من حسابي.');
+        return;
+      }
+      await refresh();
+      window.addEventListener('hashchange', renderAdmin);
+    } else {
+      const r = await api('/api/orders');
+      customer(r.orders);
+    }
+  } catch (e) {
+    $('app').innerHTML = empty(
+      'تعذّر تحميل الصفحة',
+      esc(e.message),
+      '<a class="primary" href="/login">حاول مجددًا</a>',
+    );
+  }
+}
+$('editor').addEventListener('click', (e) => {
+  if (e.target === $('editor')) {
+    const r = $('editor').getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)
+      closeEditor();
+  }
+});
+boot();

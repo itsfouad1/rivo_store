@@ -1,0 +1,448 @@
+.fox-workspace {
+  max-width: 1400px;
+  margin-inline: auto;
+}
+.fox-workspace .page-head {
+  align-items: center;
+  gap: 16px;
+}
+.fox-eyebrow {
+  color: #7852c6;
+  font-size: 12px;
+  font-weight: 700;
+}
+.fox-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 24px 0;
+}
+.fox-stats > div {
+  background: #fff;
+  border: 1px solid #e4e1ee;
+  border-radius: 16px;
+  padding: 18px 22px;
+  display: grid;
+  gap: 7px;
+}
+.fox-stats small {
+  color: #817b91;
+}
+.fox-stats strong {
+  font-size: 21px;
+  color: #211b36;
+}
+.fox-tabs {
+  display: flex;
+  gap: 8px;
+  overflow: auto;
+  border-bottom: 1px solid #dfd9ed;
+  margin: 0 0 22px;
+  padding-bottom: 10px;
+}
+.fox-tabs button {
+  white-space: nowrap;
+  padding: 12px 19px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  color: #706780;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.fox-tabs button.active {
+  background: #eee6ff;
+  color: #673cc1;
+  border-color: #ded0fa;
+}
+.fox-workspace .panel {
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.fox-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.fox-section-head h3 {
+  margin: 0 0 6px;
+}
+.fox-section-head p {
+  margin: 0;
+}
+.fox-filter-grid {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #f8f6fc;
+  border: 1px solid #e9e4f2;
+  padding: 16px;
+  border-radius: 13px;
+}
+.fox-filter-grid .field {
+  flex: 1 1 200px;
+  margin: 0;
+}
+.fox-filter-grid .check-field {
+  align-self: center;
+  flex: 0 1 auto;
+  margin: 0;
+}
+.fox-workspace input,
+.fox-workspace select {
+  min-height: 44px;
+  max-width: 100%;
+}
+.fox-workspace button {
+  min-height: 40px;
+}
+.fox-table-tools {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 18px 0;
+}
+.fox-table-tools .field {
+  margin: 0;
+  flex: 0 1 360px;
+}
+.fox-products-table {
+  min-width: 720px;
+}
+.fox-products-table td {
+  vertical-align: middle;
+}
+.fox-products-table td:first-child {
+  max-width: 280px;
+  min-width: 190px;
+}
+.fox-products-table td strong {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.fox-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.fox-actions .secondary {
+  font-size: 12px;
+  padding: 9px 12px;
+}
+.fox-actions .text-btn {
+  font-size: 11px;
+}
+.fox-id {
+  margin: 7px 0;
+  font-size: 11px;
+}
+.fox-id summary {
+  color: #857b98;
+  cursor: pointer;
+}
+.fox-id code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  margin-top: 6px;
+  max-width: 250px;
+}
+.fox-pill {
+  display: inline-block;
+  font-size: 11px;
+  color: #6d469d;
+  background: #f0eafa;
+  padding: 4px 9px;
+  border-radius: 7px;
+  white-space: normal;
+}
+.fox-pagination {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  border-top: 1px solid #ece7f3;
+  padding: 20px 0 4px;
+  margin-top: 18px;
+}
+.fox-pagination > div {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.fox-pagination button {
+  padding: 7px 13px;
+  min-width: 40px;
+}
+.fox-pagination small {
+  flex-basis: 100%;
+  text-align: center;
+  color: #8c829c;
+  font-size: 11px;
+}
+.fox-direct summary {
+  font-weight: 700;
+  cursor: pointer;
+  color: #685181;
+}
+.fox-direct code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.fox-direct-form {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.fox-direct-form input {
+  flex: 1 1 240px;
+}
+.fox-category-search {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.fox-category-search .field {
+  flex: 1 1 250px;
+  margin: 0;
+}
+.fox-breadcrumb {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+  background: #f8f6fc;
+  padding: 9px 12px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+.fox-breadcrumb button {
+  background: none;
+  border: 0;
+  color: #7350a8;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  min-height: 34px;
+}
+.fox-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 15px;
+}
+.fox-category-card {
+  border: 1px solid #e7e0ef;
+  border-radius: 15px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 9px;
+  background: #fff;
+}
+.fox-category-symbol {
+  background: #eee6fc;
+  color: #8056cb;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  font-size: 23px;
+}
+.fox-category-card h4 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.fox-category-card p {
+  margin: 0;
+  color: #82768f;
+  font-size: 11px;
+}
+.fox-category-card small {
+  font-size: 10px;
+  overflow-wrap: anywhere;
+  color: #938a9e;
+}
+.fox-category-card .fox-actions {
+  margin-top: auto;
+  padding-top: 12px;
+}
+.fox-category-card .primary,
+.fox-category-card .secondary {
+  font-size: 11px;
+  padding: 8px 11px;
+}
+.fox-message {
+  border: 1px solid #e5e0ef;
+  background: #faf8fd;
+  padding: 30px;
+  text-align: center;
+  border-radius: 13px;
+  margin: 16px 0;
+  color: #766586;
+}
+.fox-message p {
+  font-size: 13px;
+  margin: 10px 0;
+}
+.fox-message.is-error {
+  background: #fff8f8;
+  border-color: #edcfcf;
+  color: #9a4141;
+}
+.fox-message button {
+  margin-top: 8px;
+}
+.fox-loading {
+  padding: 50px 20px;
+  text-align: center;
+  color: #8a75a6;
+}
+.fox-workspace button:focus-visible,
+.fox-workspace input:focus-visible,
+.fox-workspace select:focus-visible {
+  outline: 2px solid #8953dd;
+  outline-offset: 3px;
+}
+.fox-workspace button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@media (max-width: 700px) {
+  .fox-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
+  .fox-tabs button {
+    white-space: normal;
+  }
+  .fox-workspace .page-head > .secondary {
+    white-space: nowrap;
+  }
+  .fox-workspace .page-head {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 700px) {
+  .fox-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    margin: 18px 0;
+  }
+  .fox-stats > div {
+    padding: 13px;
+  }
+  .fox-stats strong {
+    font-size: 18px;
+  }
+  .fox-workspace .panel {
+    padding: 16px;
+  }
+  .fox-tabs button {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+  .fox-filter-grid {
+    padding: 12px;
+  }
+  .fox-filter-grid .field {
+    flex-basis: 100%;
+  }
+  .fox-pagination {
+    gap: 6px;
+  }
+  .fox-pagination button {
+    padding: 6px 10px;
+  }
+  .fox-category-grid {
+    grid-template-columns: 1fr;
+  }
+  .fox-section-head > button {
+    font-size: 12px;
+  }
+  .fox-table-tools .field {
+    flex-basis: 100%;
+  }
+  .fox-category-search > button {
+    flex: 1;
+  }
+  .fox-workspace .page-head h2 {
+    font-size: 24px;
+  }
+}
+@media (max-width: 700px) {
+  .fox-workspace .table-wrap {
+    overflow: visible;
+  }
+  .fox-products-table {
+    min-width: 0;
+    width: 100%;
+  }
+  .fox-products-table thead {
+    display: none;
+  }
+  .fox-products-table tbody {
+    display: block;
+  }
+  .fox-products-table tr {
+    display: block;
+    border: 1px solid #e7e0ef;
+    border-radius: 13px;
+    padding: 12px;
+    margin-bottom: 13px;
+  }
+  .fox-products-table td {
+    display: grid;
+    grid-template-columns: 105px minmax(0, 1fr);
+    gap: 10px;
+    border: 0;
+    padding: 9px 0;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+  .fox-products-table td:before {
+    content: attr(data-label);
+    font-size: 11px;
+    color: #8b7e9a;
+  }
+  .fox-products-table td:first-child,
+  .fox-products-table td:last-child {
+    display: block;
+    min-width: 0;
+    max-width: none;
+  }
+  .fox-products-table td:first-child:before,
+  .fox-products-table td:last-child:before {
+    display: none;
+  }
+  .fox-products-table td:last-child .fox-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .fox-products-table .fox-id code {
+    max-width: 100%;
+  }
+  .fox-products-table td:first-child {
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eee8f5;
+  }
+  .fox-products-table td:last-child button {
+    width: 100%;
+  }
+}

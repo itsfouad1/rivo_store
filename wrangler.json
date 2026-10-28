@@ -3,9 +3,7 @@
   "name": "rivo-store",
   "main": "worker.mjs",
   "compatibility_date": "2026-05-15",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "assets": {
     "directory": "./public",
@@ -36,10 +34,7 @@
     }
   ],
   "triggers": {
-    "crons": [
-      "17 3 * * *",
-      "*/15 * * * *"
-    ]
+    "crons": ["17 3 * * *", "*/15 * * * *"]
   },
   "vars": {
     "SUPABASE_URL": "https://atgxzobzrnjazrgimqqy.supabase.co",

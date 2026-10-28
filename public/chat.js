@@ -1,70 +1,670 @@
-(()=>{
- const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const labels={waiting:'بانتظار موظف',assigned:'قيد المعالجة',waiting_customer:'بانتظار رد الزبون',escalated:'محالة للإدارة',closed:'مغلقة'};
- const desk=document.body.hasAttribute('data-chat-desk');let user,active=null,conversation=null,linkedOrder=null,messages=[],more=false,busy=false,nonce=null,listPage=1,manager=false,timer,loading=false,summaryTimer,unread=0,botUI=null,launcher=null,summaryBusy=false,summaryQueued=false,lastRead=new Map(),readPending=new Map(),toolsUI=null,queueSequence=0,queueFilter={q:'',priority:'',assignee:''};
- const $=id=>document.getElementById('rc-'+id);
- function fitCompose(){if(desk||!$('text'))return;const text=$('text');text.style.height='auto';text.style.height=Math.min(100,Math.max(48,text.scrollHeight))+'px';}
- async function api(path,method='GET',body){const r=await fetch('/api'+path,{method,cache:'no-store',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw new Error(d.error||'تعذّر الاتصال بالدعم');return d}
- const date=v=>new Intl.DateTimeFormat('ar-PS',{dateStyle:'short',timeStyle:'short'}).format(new Date(v));
-
- async function refreshSummary(){if(!user||document.hidden)return;if(summaryBusy){summaryQueued=true;return}summaryBusy=true;try{const d=await api('/chat/summary');unread=d.unread_messages;if(launcher){launcher.textContent='اسأل ريفو';if(unread){const badge=document.createElement('span');badge.className='rivo-unread';badge.textContent=unread>99?'99+':unread;badge.setAttribute('aria-label',unread+' رسالة جديدة');launcher.append(badge);}}botUI?.setUnread(unread);}catch{}finally{summaryBusy=false;if(summaryQueued){summaryQueued=false;refreshSummary();}}}
- async function acknowledge(id,last){if(!id||!last||document.hidden||(document.hasFocus&&!document.hasFocus())||(!desk&&!document.querySelector('.rivo-chat-dialog[open] #ra-human:not([hidden])'))||(lastRead.get(id)||0)>=last||(readPending.get(id)||0)>=last)return;const box=$('messages'),distance=box.scrollHeight-box.scrollTop-box.clientHeight;if(Number.isFinite(distance)&&distance>80)return;if(box.getBoundingClientRect){const rect=box.getBoundingClientRect(),dialog=box.closest('dialog'),bottom=Math.min(window.innerHeight,dialog?.getBoundingClientRect().bottom??window.innerHeight);if(rect.bottom<=0||rect.bottom>bottom+10||rect.top>=window.innerHeight)return;}readPending.set(id,last);try{await api('/chat/'+id+'/read','POST',{last_seq:last});lastRead.set(id,last);if(!desk)await refreshSummary();}catch{}finally{if(readPending.get(id)===last)readPending.delete(id);}}
- function shell(){if(!desk)return `<div class="chat-shell customer-chat"><div class="chat-header"><span class="chat-avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 13v-2a8 8 0 0 1 16 0v2M4 12H3v6h4v-6H4Zm16 0h1v6h-4v-6h3ZM19 18c0 3-3 3-6 3"/></svg></span><div class="chat-heading"><h2>الدعم الفني</h2><p>اترك رسالتك وبنتابع معك هون</p></div><button id="rc-close" class="chat-icon-button" type="button" aria-label="إغلاق نافذة الدعم">×</button></div><div class="chat-human-options"><button class="chat-handoff" type="button" id="ra-back">الرجوع للمساعد الآلي</button><details id="rc-details"><summary>تفاصيل المحادثة والطلب</summary><p class="chat-help">قد لا يتوفر موظف الآن. رسائلك محفوظة؛ لا ترسل كلمات مرور أو بيانات دفع.</p><div id="rc-meta" class="chat-meta"></div><div id="rc-actions" class="chat-controls"></div><button id="rc-refresh" class="secondary" type="button">تحديث المحادثة</button></details></div><button id="rc-older" class="secondary chat-load-older" hidden>رسائل أقدم</button><div id="rc-messages" class="chat-messages" role="log" aria-label="رسائل المحادثة" aria-live="polite"></div><form id="rc-compose" class="chat-compose"><label class="chat-visually-hidden" for="rc-text">رسالتك</label><div class="chat-input-row"><textarea id="rc-text" rows="1" maxlength="4000" required placeholder="اكتب رسالتك…"></textarea><button id="rc-send" class="primary chat-send-icon" type="submit" aria-label="إرسال الرسالة"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 3-7 18-4-7-7-4 18-7ZM10 14 21 3"/></svg></button></div><p id="rc-error" class="chat-error" role="alert"></p></form></div>`;return `<div class="chat-shell"><div class="chat-header"><h2>المحادثة</h2></div><p class="chat-help">دعم بشري برسائل محفوظة. قد لا يكون موظف متاحًا الآن؛ لا ترسل كلمات مرور أو بيانات بطاقة الدفع.</p><div id="rc-meta" class="chat-meta"></div><div id="rc-actions" class="chat-controls"></div><button id="rc-older" class="secondary" hidden>رسائل أقدم</button><div id="rc-messages" class="chat-messages" role="log" aria-label="رسائل المحادثة"></div><div id="rc-tools"></div><form id="rc-compose" class="chat-compose"><label for="rc-text">الرد أو الملاحظة</label><textarea id="rc-text" maxlength="4000" required></textarea><label><input id="rc-internal" type="checkbox">ملاحظة داخلية للفريق — لا تظهر للزبون</label><div class="chat-controls"><button id="rc-send" class="primary" type="submit">إرسال</button><button id="rc-refresh" class="secondary" type="button">تحديث</button></div></form><p id="rc-error" class="chat-error" role="alert"></p></div>`}
- function renderMessages(scroll=false){const box=$('messages'),atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<80;box.innerHTML=messages.map(m=>`<article class="chat-message ${m.sender_kind} ${m.visibility==='internal'?'internal':''}"><strong>${m.visibility==='internal'?'ملاحظة داخلية · ':''}${esc(m.sender_kind==='customer'?'الزبون':m.sender_name||'فريق ريفو')}</strong><p>${esc(m.body)}</p><small>${esc(date(m.created_at))}</small></article>`).join('')||(desk?'<p class="chat-help">لا توجد رسائل بعد.</p>':'<div class="chat-empty"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v13H8l-4 4V4Zm4 4h8M8 12h6"/></svg><p>أرسل رسالتك هون، وفريق ريفو بيتابع معك.</p><small>بتقدر ترجع للمحادثة لاحقًا من نفس الحساب.</small></div>');$('older').hidden=!more;if(scroll||atBottom)box.scrollTop=box.scrollHeight;}
- function renderMeta(){
-  const c=conversation;toolsUI?.update(c);if(!desk&&c&&$('order')){$('order').value=c.order_id||'';$('order').disabled=true;}$('meta').innerHTML=c?`<b>${esc(labels[c.status])}</b> · ${esc(c.subject)}<br>رقم المحادثة: <bdi>${esc(c.id)}</bdi>${c.order_id?'<br>الطلب: <bdi>'+esc(c.order_id)+'</bdi>':''}${desk&&c.escalation_reason?'<p class="chat-reason">سبب التصعيد: '+esc(c.escalation_reason)+'</p>':''}`:'محادثة جديدة مع فريق الدعم';if(desk&&linkedOrder){const o=linkedOrder;$('meta').innerHTML+='<section class="info-box"><b>الطلب المرتبط</b><p>'+esc(o.items.map(i=>i.name+' × '+i.quantity).join('، '))+'</p><p>الدفع: '+esc(o.payment_status)+' · التنفيذ: '+esc(o.status)+'</p><p>اللاعب: '+esc(o.player_id||'غير مطلوب')+'</p><p>'+esc(o.customer_update||'')+'</p><p>ملاحظة الزبون: '+esc(o.customer_note||'')+'</p></section>';}
-  $('send').disabled=busy||c?.status==='closed';$('text').disabled=c?.status==='closed';$('actions').replaceChildren();
-  function button(label,fn){const b=document.createElement('button');b.type='button';b.className='secondary';b.textContent=label;b.onclick=fn;$('actions').append(b)}
-  if(!desk&&c&&c.status!=='closed')button('إنهاء المحادثة',async()=>{try{await api('/chat/'+active+'/close','POST',{});await refresh();await customerList()}catch(e){$('error').textContent=e.message}});
-  if(!desk&&c?.status==='closed')button('طلب مساعدة جديد',()=>{active=null;conversation=null;linkedOrder=null;messages=[];nonce=null;$('text').value='';renderMeta();renderMessages();$('order').disabled=false});
-  if(desk&&c&&c.status!=='closed'){
-   button('استلام / تولّي المحادثة',()=>action('claim'));
-   if(manager||c.assignee===user.id){button('بانتظار الزبون',()=>action('wait'));button('حل وإغلاق',()=>action('close'));button('تصعيد للإدارة',()=>{const reason=window.prompt('اكتب ملخص المشكلة وسبب التصعيد (داخلي):');if(reason?.trim())action('escalate',reason.trim())});if(manager)button('إعادتها لقائمة الدعم',()=>action('release'));}
-  }
- }
- async function refresh(older=false){
-  if(!active||loading===active)return;const id=active;loading=id;
-  try{const r=await api('/chat/'+id+(older&&messages.length?'?before='+messages[0].seq:''));if(active!==id)return;conversation=r.conversation;linkedOrder=r.linked_order;const previousMore=more;more=r.has_more;if(older){const map=new Map([...r.messages,...messages].map(m=>[m.seq,m]));messages=[...map.values()].sort((a,b)=>a.seq-b.seq)}else{const keepOlder=messages.length&&r.messages.length&&messages[0].seq<r.messages[0].seq;const map=new Map([...messages,...r.messages].map(m=>[m.seq,m]));messages=[...map.values()].sort((a,b)=>a.seq-b.seq);if(keepOlder)more=previousMore;}renderMeta();renderMessages();$('error').textContent='';await acknowledge(id,r.messages.at(-1)?.seq);}
-  catch(e){if(active===id){$('error').textContent=e.message;if(desk){messages=[];conversation=null;linkedOrder=null;renderMeta();renderMessages();$('send').disabled=true;}}}finally{if(loading===id)loading=false;}
- }
- async function action(kind,reason,extra={}){if(!conversation||busy)return;busy=true;try{await api('/chat/'+active+'/action','POST',{...extra,action:kind,reason,revision:conversation.revision});if(kind==='escalate'&&!manager){active=null;conversation=null;linkedOrder=null;messages=[];renderMeta();renderMessages();$('send').disabled=true;}else await refresh();await queue()}catch(e){$('error').textContent=e.message;}finally{busy=false;if(conversation)renderMeta();}}
- async function customerList(){const r=await api('/chat');const current=r.conversations.find(c=>c.unread_count>0)||r.conversations.find(c=>c.status!=='closed');$('history').innerHTML='<option value="">اختر محادثة سابقة</option>'+r.conversations.map(c=>`<option value="${c.id}">${esc(labels[c.status])}${c.unread_count?' · '+c.unread_count+' جديدة':''} · ${esc(c.subject)} · ${esc(date(c.created_at))}</option>`).join('');if(!active&&current)active=current.id;$('history').value=active||'';if(active){$('order').disabled=true;await refresh()}}
- async function queue(){
-  const requestId=++queueSequence;try{const mode=$('queue-mode').value;const r=await api('/chat/queue?'+new URLSearchParams({page:listPage,mode,...queueFilter}));if(requestId!==queueSequence)return;manager=r.manager;$('queue-count').textContent=r.total+' محادثة · صفحة '+listPage+' · '+r.notifications.unread_messages+' رسالة غير مقروءة ضمن صلاحياتك';document.title=(r.notifications.unread_messages?'('+r.notifications.unread_messages+') ':'')+'محادثات RIVO';
-   $('queue').innerHTML=r.conversations.map(c=>`<div class="chat-queue-card"><b>${esc(c.customer_name)}</b>${c.unread_count?'<span class="rivo-unread">'+c.unread_count+' جديدة</span>':''}<p>${esc(c.subject)}</p><p>${esc(c.customer_email||'')}${c.order_id?' · طلب #'+esc(c.order_id.slice(0,8)):''}</p><span class="chat-priority ${c.priority==='urgent'?'urgent':''}">${c.priority==='urgent'?'عاجلة':'عادية'}</span><small>${esc(labels[c.status])}${c.assignee_name?' · '+esc(c.assignee_name):''}<br>${esc(date(c.updated_at))}</small><div>${c.status==='waiting'&&!c.assignee||manager&&c.status==='escalated'?'<button class="primary" data-claim="'+c.id+'" data-revision="'+c.revision+'">استلام</button>':''}${manager||c.assignee===user.id?'<button class="secondary" data-open="'+c.id+'">فتح</button>':''}</div></div>`).join('')||'<p>لا توجد محادثات في هذه القائمة.</p>';
-   $('queue').querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>open(b.dataset.open));$('queue').querySelectorAll('[data-claim]').forEach(b=>b.onclick=async()=>{try{await api('/chat/'+b.dataset.claim+'/action','POST',{action:'claim',revision:Number(b.dataset.revision)});await open(b.dataset.claim);await queue()}catch(e){$('queue-count').textContent=e.message}});
-   $('prev').disabled=listPage<=1;$('next').disabled=listPage>=r.pages;
-  }catch(e){if(requestId===queueSequence)$('queue-count').textContent=e.message;}
- }
- async function open(id){if(busy){$('error').textContent='انتظر انتهاء الإرسال قبل تغيير المحادثة';return}active=id;conversation=null;linkedOrder=null;messages=[];more=false;nonce=null;$('text').value='';renderMeta();renderMessages();await refresh();}
- function onVisibleScroll(){acknowledge(active,messages.at(-1)?.seq)}
- function bind(){
-  $('messages').onscroll=onVisibleScroll;window.addEventListener('scroll',onVisibleScroll,true);window.addEventListener('focus',onVisibleScroll);document.addEventListener('visibilitychange',onVisibleScroll);$('text').oninput=()=>{nonce=null;fitCompose()};if(desk)$('internal').onchange=()=>{nonce=null};
-  $('compose').onsubmit=async e=>{e.preventDefault();if(busy||desk&&!active)return;busy=true;$('send').disabled=true;const message=$('text').value;nonce??=crypto.randomUUID();$('text').disabled=true;
-   try{if(!active){const r=await api('/chat','POST',{message,client_id:nonce,order_id:$('order').value||null});active=r.id;$('order').disabled=true;}else await api('/chat/'+active+'/messages','POST',{message,client_id:nonce,internal:desk&&$('internal').checked});$('text').value='';nonce=null;await refresh();if(!desk)await customerList();else await queue();}
-   catch(err){$('error').textContent=err.message;}finally{busy=false;$('text').disabled=conversation?.status==='closed';$('send').disabled=conversation?.status==='closed';}
+(() => {
+  const esc = (v) =>
+    String(v ?? '').replace(
+      /[&<>"']/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+    );
+  const labels = {
+    waiting: 'بانتظار موظف',
+    assigned: 'قيد المعالجة',
+    waiting_customer: 'بانتظار رد الزبون',
+    escalated: 'محالة للإدارة',
+    closed: 'مغلقة',
   };
-  $('refresh').onclick=async()=>{await refresh();if(desk)await queue();else await customerList()};$('older').onclick=()=>refresh(true);
- }
- async function boot(){try{
-  ({user}=await api('/session'));if(desk){if(!user||!['owner','admin','support'].includes(user.role)){document.getElementById('chat-desk').innerHTML='<p>الدخول للفريق فقط. <a href="/login">تسجيل الدخول</a></p>';return}manager=['owner','admin'].includes(user.role);document.getElementById('chat-desk').innerHTML=`<div class="chat-desk-grid"><section class="panel"><h2>صندوق الدعم</h2><label>القائمة <select id="rc-queue-mode"><option value="open">المفتوحة</option><option value="all">كل الحالات</option><option value="closed">المغلقة</option>${manager?'<option value="escalated">المصعّدة للإدارة</option>':''}</select></label><form id="rc-queue-search" class="chat-search"><label>البحث بالمحادثات<input name="q" maxlength="200" placeholder="الاسم، الإيميل، رقم الطلب أو المحادثة"></label><label>الأولوية<select name="priority"><option value="">كل الأولويات</option><option value="urgent">عاجلة</option><option value="normal">عادية</option></select></label><label>الإسناد<select name="assignee"><option value="">الكل ضمن صلاحياتي</option><option value="mine">المسندة لي</option><option value="unassigned">غير المسندة</option></select></label><div class="chat-controls"><button class="primary" type="submit">بحث</button><button class="secondary" type="button" id="rc-clear-search">مسح الفلاتر</button></div></form><p id="rc-queue-count" role="status"></p><div id="rc-queue" class="chat-queue"></div><div class="chat-controls"><button id="rc-prev" class="secondary">السابق</button><button id="rc-next" class="secondary">التالي</button></div><a href="/admin">بحث الطلبات ولوحة العمل ←</a></section><section class="panel">${shell()}</section></div>`;bind();$('send').disabled=true;$('queue-mode').onchange=()=>{listPage=1;queue()};$('prev').onclick=()=>{listPage--;queue()};$('next').onclick=()=>{listPage++;queue()};$('queue-search').onsubmit=e=>{e.preventDefault();const f=e.target;queueFilter={q:f.elements.q.value,priority:f.elements.priority.value,assignee:f.elements.assignee.value};listPage=1;queue();};$('clear-search').onclick=()=>{queueFilter={q:'',priority:'',assignee:''};for(const k of Object.keys(queueFilter))$('queue-search').elements[k].value='';$('queue-mode').value='open';listPage=1;queue();};await queue();const {mountChatTools}=await import('/chat-tools-ui.js');toolsUI=await mountChatTools($('tools'),{api,manager,getConversation:()=>conversation,getText:()=>$('text').value,isBusy:()=>busy,onStaffList:staff=>{const select=$('queue-search').elements.assignee,selected=select.value;select.innerHTML='<option value="">الكل ضمن صلاحياتي</option><option value="mine">المسندة لي</option><option value="unassigned">غير المسندة</option>'+staff.map(u=>'<option value="'+esc(u.id)+'">'+esc(u.name)+' · '+esc(u.email)+'</option>').join('');if(selected&&!['mine','unassigned'].includes(selected)&&!staff.some(u=>u.id===selected)){const option=document.createElement('option');option.value=selected;option.textContent=selected+' (غير متاح حاليًا)';select.append(option)}select.value=selected;},setText:value=>{$('text').value=value;nonce=null;$('text').focus();},onAction:(kind,extra)=>action(kind,undefined,extra)});toolsUI.update(conversation);}
-  else{
-   if(user&&user.role!=='customer')return;if(!['/','/index.html','/account','/order.html','/payment.html'].includes(location.pathname))return;
-   const launch=document.createElement('button');launch.className='rivo-chat-launch';launch.textContent='اسأل ريفو';launch.type='button';document.body.append(launch);launcher=launch;
-      const dialog=document.createElement('dialog');dialog.className='rivo-chat-dialog';dialog.setAttribute('aria-label','محادثة دعم ريفو');dialog.setAttribute('dir','rtl');dialog.innerHTML='<div id="ra-assistant"></div><div id="ra-human" hidden>'+(user?shell():'')+'</div>';document.body.append(dialog);
-   const botRoot=document.getElementById('ra-assistant'),humanRoot=document.getElementById('ra-human');
-   const {mountAssistant}=await import('/assistant-ui.js');
-   const bot=mountAssistant(botRoot,{request:b=>api('/assistant','POST',b),onClose:()=>dialog.close(),onHuman:async summary=>{if(busy)throw new Error('انتظر انتهاء إرسال الرسالة الحالية');if(!user){location.assign('/login');return}botRoot.hidden=true;humanRoot.hidden=false;await customerList();if(summary&&!$('text').value.trim()){$('text').value='ملخص المساعد الآلي — راجعه وعدّله قبل الإرسال:\n\n'+summary;nonce=null;}fitCompose();$('text').focus();}});
-   botUI=bot;launch.onclick=()=>{dialog.showModal();bot.start();};
-   if(!user)return;
-   async function summaryTick(){await refreshSummary();summaryTimer=setTimeout(summaryTick,30000)}summaryTick();window.addEventListener('pagehide',()=>clearTimeout(summaryTimer));
-   document.getElementById('ra-back').onclick=()=>{humanRoot.hidden=true;botRoot.hidden=false;bot.start();};
-   const history=document.createElement('select');history.id='rc-history';history.setAttribute('aria-label','المحادثات السابقة');$('meta').before(history);
-   const label=document.createElement('label');label.className='chat-meta';label.textContent='الطلب المرتبط (اختياري) ';const order=document.createElement('select');order.id='rc-order';order.innerHTML='<option value="">استفسار عام</option>';label.append(order);history.after(label);bind();$('close').onclick=()=>dialog.close();history.onchange=()=>{if(history.value)open(history.value)};
-   let r;try{r=await api('/orders')}catch{r={orders:[]};$('error').textContent='تعذّر تحميل طلباتك؛ يمكنك إرسال استفسار عام.'}for(const o of r.orders){const option=document.createElement('option');option.value=o.id;option.textContent='#'+o.id.slice(0,8)+' · '+o.items.map(i=>i.name).join('، ');order.append(option);}const linked=new URLSearchParams(location.search).get('order');if(!active&&r.orders.some(o=>o.id===linked))order.value=linked;
-   bind();$('close').onclick=()=>dialog.close();history.onchange=()=>{if(history.value)open(history.value)};launch.onclick=async()=>{dialog.showModal();bot.start();if(!humanRoot.hidden){try{await customerList()}catch(e){$('error').textContent=e.message}}};renderMeta();renderMessages();
+  const desk = document.body.hasAttribute('data-chat-desk');
+  let user,
+    active = null,
+    conversation = null,
+    linkedOrder = null,
+    messages = [],
+    more = false,
+    busy = false,
+    nonce = null,
+    listPage = 1,
+    manager = false,
+    timer,
+    loading = false,
+    summaryTimer,
+    unread = 0,
+    botUI = null,
+    launcher = null,
+    summaryBusy = false,
+    summaryQueued = false,
+    lastRead = new Map(),
+    readPending = new Map(),
+    toolsUI = null,
+    queueSequence = 0,
+    queueFilter = { q: '', priority: '', assignee: '' };
+  const $ = (id) => document.getElementById('rc-' + id);
+  function fitCompose() {
+    if (desk || !$('text')) return;
+    const text = $('text');
+    text.style.height = 'auto';
+    text.style.height = Math.min(100, Math.max(48, text.scrollHeight)) + 'px';
   }
-  async function tick(){if(!document.hidden&&(desk||document.querySelector('.rivo-chat-dialog[open] #ra-human:not([hidden])'))){await refresh();if(desk)await queue();}timer=setTimeout(tick,12000)}timer=setTimeout(tick,12000);window.addEventListener('pagehide',()=>clearTimeout(timer));
- }catch(e){if(desk)document.getElementById('chat-desk').textContent=e.message;}}
- boot();
+  async function api(path, method = 'GET', body) {
+    const r = await fetch('/api' + path, {
+      method,
+      cache: 'no-store',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'تعذّر الاتصال بالدعم');
+    return d;
+  }
+  const date = (v) =>
+    new Intl.DateTimeFormat('ar-PS', { dateStyle: 'short', timeStyle: 'short' }).format(
+      new Date(v),
+    );
+
+  async function refreshSummary() {
+    if (!user || document.hidden) return;
+    if (summaryBusy) {
+      summaryQueued = true;
+      return;
+    }
+    summaryBusy = true;
+    try {
+      const d = await api('/chat/summary');
+      unread = d.unread_messages;
+      if (launcher) {
+        launcher.textContent = 'اسأل ريفو';
+        if (unread) {
+          const badge = document.createElement('span');
+          badge.className = 'rivo-unread';
+          badge.textContent = unread > 99 ? '99+' : unread;
+          badge.setAttribute('aria-label', unread + ' رسالة جديدة');
+          launcher.append(badge);
+        }
+      }
+      botUI?.setUnread(unread);
+    } catch {
+    } finally {
+      summaryBusy = false;
+      if (summaryQueued) {
+        summaryQueued = false;
+        refreshSummary();
+      }
+    }
+  }
+  async function acknowledge(id, last) {
+    if (
+      !id ||
+      !last ||
+      document.hidden ||
+      (document.hasFocus && !document.hasFocus()) ||
+      (!desk && !document.querySelector('.rivo-chat-dialog[open] #ra-human:not([hidden])')) ||
+      (lastRead.get(id) || 0) >= last ||
+      (readPending.get(id) || 0) >= last
+    )
+      return;
+    const box = $('messages'),
+      distance = box.scrollHeight - box.scrollTop - box.clientHeight;
+    if (Number.isFinite(distance) && distance > 80) return;
+    if (box.getBoundingClientRect) {
+      const rect = box.getBoundingClientRect(),
+        dialog = box.closest('dialog'),
+        bottom = Math.min(
+          window.innerHeight,
+          dialog?.getBoundingClientRect().bottom ?? window.innerHeight,
+        );
+      if (rect.bottom <= 0 || rect.bottom > bottom + 10 || rect.top >= window.innerHeight) return;
+    }
+    readPending.set(id, last);
+    try {
+      await api('/chat/' + id + '/read', 'POST', { last_seq: last });
+      lastRead.set(id, last);
+      if (!desk) await refreshSummary();
+    } catch {
+    } finally {
+      if (readPending.get(id) === last) readPending.delete(id);
+    }
+  }
+  function shell() {
+    if (!desk)
+      return `<div class="chat-shell customer-chat"><div class="chat-header"><span class="chat-avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 13v-2a8 8 0 0 1 16 0v2M4 12H3v6h4v-6H4Zm16 0h1v6h-4v-6h3ZM19 18c0 3-3 3-6 3"/></svg></span><div class="chat-heading"><h2>الدعم الفني</h2><p>اترك رسالتك وبنتابع معك هون</p></div><button id="rc-close" class="chat-icon-button" type="button" aria-label="إغلاق نافذة الدعم">×</button></div><div class="chat-human-options"><button class="chat-handoff" type="button" id="ra-back">الرجوع للمساعد الآلي</button><details id="rc-details"><summary>تفاصيل المحادثة والطلب</summary><p class="chat-help">قد لا يتوفر موظف الآن. رسائلك محفوظة؛ لا ترسل كلمات مرور أو بيانات دفع.</p><div id="rc-meta" class="chat-meta"></div><div id="rc-actions" class="chat-controls"></div><button id="rc-refresh" class="secondary" type="button">تحديث المحادثة</button></details></div><button id="rc-older" class="secondary chat-load-older" hidden>رسائل أقدم</button><div id="rc-messages" class="chat-messages" role="log" aria-label="رسائل المحادثة" aria-live="polite"></div><form id="rc-compose" class="chat-compose"><label class="chat-visually-hidden" for="rc-text">رسالتك</label><div class="chat-input-row"><textarea id="rc-text" rows="1" maxlength="4000" required placeholder="اكتب رسالتك…"></textarea><button id="rc-send" class="primary chat-send-icon" type="submit" aria-label="إرسال الرسالة"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 3-7 18-4-7-7-4 18-7ZM10 14 21 3"/></svg></button></div><p id="rc-error" class="chat-error" role="alert"></p></form></div>`;
+    return `<div class="chat-shell"><div class="chat-header"><h2>المحادثة</h2></div><p class="chat-help">دعم بشري برسائل محفوظة. قد لا يكون موظف متاحًا الآن؛ لا ترسل كلمات مرور أو بيانات بطاقة الدفع.</p><div id="rc-meta" class="chat-meta"></div><div id="rc-actions" class="chat-controls"></div><button id="rc-older" class="secondary" hidden>رسائل أقدم</button><div id="rc-messages" class="chat-messages" role="log" aria-label="رسائل المحادثة"></div><div id="rc-tools"></div><form id="rc-compose" class="chat-compose"><label for="rc-text">الرد أو الملاحظة</label><textarea id="rc-text" maxlength="4000" required></textarea><label><input id="rc-internal" type="checkbox">ملاحظة داخلية للفريق — لا تظهر للزبون</label><div class="chat-controls"><button id="rc-send" class="primary" type="submit">إرسال</button><button id="rc-refresh" class="secondary" type="button">تحديث</button></div></form><p id="rc-error" class="chat-error" role="alert"></p></div>`;
+  }
+  function renderMessages(scroll = false) {
+    const box = $('messages'),
+      atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    box.innerHTML =
+      messages
+        .map(
+          (m) =>
+            `<article class="chat-message ${m.sender_kind} ${m.visibility === 'internal' ? 'internal' : ''}"><strong>${m.visibility === 'internal' ? 'ملاحظة داخلية · ' : ''}${esc(m.sender_kind === 'customer' ? 'الزبون' : m.sender_name || 'فريق ريفو')}</strong><p>${esc(m.body)}</p><small>${esc(date(m.created_at))}</small></article>`,
+        )
+        .join('') ||
+      (desk
+        ? '<p class="chat-help">لا توجد رسائل بعد.</p>'
+        : '<div class="chat-empty"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v13H8l-4 4V4Zm4 4h8M8 12h6"/></svg><p>أرسل رسالتك هون، وفريق ريفو بيتابع معك.</p><small>بتقدر ترجع للمحادثة لاحقًا من نفس الحساب.</small></div>');
+    $('older').hidden = !more;
+    if (scroll || atBottom) box.scrollTop = box.scrollHeight;
+  }
+  function renderMeta() {
+    const c = conversation;
+    toolsUI?.update(c);
+    if (!desk && c && $('order')) {
+      $('order').value = c.order_id || '';
+      $('order').disabled = true;
+    }
+    $('meta').innerHTML = c
+      ? `<b>${esc(labels[c.status])}</b> · ${esc(c.subject)}<br>رقم المحادثة: <bdi>${esc(c.id)}</bdi>${c.order_id ? '<br>الطلب: <bdi>' + esc(c.order_id) + '</bdi>' : ''}${desk && c.escalation_reason ? '<p class="chat-reason">سبب التصعيد: ' + esc(c.escalation_reason) + '</p>' : ''}`
+      : 'محادثة جديدة مع فريق الدعم';
+    if (desk && linkedOrder) {
+      const o = linkedOrder;
+      $('meta').innerHTML +=
+        '<section class="info-box"><b>الطلب المرتبط</b><p>' +
+        esc(
+          o.items
+            .map(
+              (i) =>
+                i.name +
+                ' × ' +
+                i.quantity +
+                (i.player_id
+                  ? ' — الحساب: ' +
+                    i.player_id +
+                    (i.input_source === 'legacy' ? ' (قديم مشترك)' : '')
+                  : ''),
+            )
+            .join('، '),
+        ) +
+        '</p><p>الدفع: ' +
+        esc(o.payment_status) +
+        ' · التنفيذ: ' +
+        esc(o.status) +
+        '</p><p>اللاعب: ' +
+        esc(o.player_id || 'غير مطلوب') +
+        '</p><p>' +
+        esc(o.customer_update || '') +
+        '</p><p>ملاحظة الزبون: ' +
+        esc(o.customer_note || '') +
+        '</p></section>';
+    }
+    $('send').disabled = busy || c?.status === 'closed';
+    $('text').disabled = c?.status === 'closed';
+    $('actions').replaceChildren();
+    function button(label, fn) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'secondary';
+      b.textContent = label;
+      b.onclick = fn;
+      $('actions').append(b);
+    }
+    if (!desk && c && c.status !== 'closed')
+      button('إنهاء المحادثة', async () => {
+        try {
+          await api('/chat/' + active + '/close', 'POST', {});
+          await refresh();
+          await customerList();
+        } catch (e) {
+          $('error').textContent = e.message;
+        }
+      });
+    if (!desk && c?.status === 'closed')
+      button('طلب مساعدة جديد', () => {
+        active = null;
+        conversation = null;
+        linkedOrder = null;
+        messages = [];
+        nonce = null;
+        $('text').value = '';
+        renderMeta();
+        renderMessages();
+        $('order').disabled = false;
+      });
+    if (desk && c && c.status !== 'closed') {
+      button('استلام / تولّي المحادثة', () => action('claim'));
+      if (manager || c.assignee === user.id) {
+        button('بانتظار الزبون', () => action('wait'));
+        button('حل وإغلاق', () => action('close'));
+        button('تصعيد للإدارة', () => {
+          const reason = window.prompt('اكتب ملخص المشكلة وسبب التصعيد (داخلي):');
+          if (reason?.trim()) action('escalate', reason.trim());
+        });
+        if (manager) button('إعادتها لقائمة الدعم', () => action('release'));
+      }
+    }
+  }
+  async function refresh(older = false) {
+    if (!active || loading === active) return;
+    const id = active;
+    loading = id;
+    try {
+      const r = await api(
+        '/chat/' + id + (older && messages.length ? '?before=' + messages[0].seq : ''),
+      );
+      if (active !== id) return;
+      conversation = r.conversation;
+      linkedOrder = r.linked_order;
+      const previousMore = more;
+      more = r.has_more;
+      if (older) {
+        const map = new Map([...r.messages, ...messages].map((m) => [m.seq, m]));
+        messages = [...map.values()].sort((a, b) => a.seq - b.seq);
+      } else {
+        const keepOlder =
+          messages.length && r.messages.length && messages[0].seq < r.messages[0].seq;
+        const map = new Map([...messages, ...r.messages].map((m) => [m.seq, m]));
+        messages = [...map.values()].sort((a, b) => a.seq - b.seq);
+        if (keepOlder) more = previousMore;
+      }
+      renderMeta();
+      renderMessages();
+      $('error').textContent = '';
+      await acknowledge(id, r.messages.at(-1)?.seq);
+    } catch (e) {
+      if (active === id) {
+        $('error').textContent = e.message;
+        if (desk) {
+          messages = [];
+          conversation = null;
+          linkedOrder = null;
+          renderMeta();
+          renderMessages();
+          $('send').disabled = true;
+        }
+      }
+    } finally {
+      if (loading === id) loading = false;
+    }
+  }
+  async function action(kind, reason, extra = {}) {
+    if (!conversation || busy) return;
+    busy = true;
+    try {
+      await api('/chat/' + active + '/action', 'POST', {
+        ...extra,
+        action: kind,
+        reason,
+        revision: conversation.revision,
+      });
+      if (kind === 'escalate' && !manager) {
+        active = null;
+        conversation = null;
+        linkedOrder = null;
+        messages = [];
+        renderMeta();
+        renderMessages();
+        $('send').disabled = true;
+      } else await refresh();
+      await queue();
+    } catch (e) {
+      $('error').textContent = e.message;
+    } finally {
+      busy = false;
+      if (conversation) renderMeta();
+    }
+  }
+  async function customerList() {
+    const r = await api('/chat');
+    const current =
+      r.conversations.find((c) => c.unread_count > 0) ||
+      r.conversations.find((c) => c.status !== 'closed');
+    $('history').innerHTML =
+      '<option value="">اختر محادثة سابقة</option>' +
+      r.conversations
+        .map(
+          (c) =>
+            `<option value="${c.id}">${esc(labels[c.status])}${c.unread_count ? ' · ' + c.unread_count + ' جديدة' : ''} · ${esc(c.subject)} · ${esc(date(c.created_at))}</option>`,
+        )
+        .join('');
+    if (!active && current) active = current.id;
+    $('history').value = active || '';
+    if (active) {
+      $('order').disabled = true;
+      await refresh();
+    }
+  }
+  async function queue() {
+    const requestId = ++queueSequence;
+    try {
+      const mode = $('queue-mode').value;
+      const r = await api(
+        '/chat/queue?' + new URLSearchParams({ page: listPage, mode, ...queueFilter }),
+      );
+      if (requestId !== queueSequence) return;
+      manager = r.manager;
+      $('queue-count').textContent =
+        r.total +
+        ' محادثة · صفحة ' +
+        listPage +
+        ' · ' +
+        r.notifications.unread_messages +
+        ' رسالة غير مقروءة ضمن صلاحياتك';
+      document.title =
+        (r.notifications.unread_messages ? '(' + r.notifications.unread_messages + ') ' : '') +
+        'محادثات RIVO';
+      $('queue').innerHTML =
+        r.conversations
+          .map(
+            (c) =>
+              `<div class="chat-queue-card"><b>${esc(c.customer_name)}</b>${c.unread_count ? '<span class="rivo-unread">' + c.unread_count + ' جديدة</span>' : ''}<p>${esc(c.subject)}</p><p>${esc(c.customer_email || '')}${c.order_id ? ' · طلب #' + esc(c.order_id.slice(0, 8)) : ''}</p><span class="chat-priority ${c.priority === 'urgent' ? 'urgent' : ''}">${c.priority === 'urgent' ? 'عاجلة' : 'عادية'}</span><small>${esc(labels[c.status])}${c.assignee_name ? ' · ' + esc(c.assignee_name) : ''}<br>${esc(date(c.updated_at))}</small><div>${(c.status === 'waiting' && !c.assignee) || (manager && c.status === 'escalated') ? '<button class="primary" data-claim="' + c.id + '" data-revision="' + c.revision + '">استلام</button>' : ''}${manager || c.assignee === user.id ? '<button class="secondary" data-open="' + c.id + '">فتح</button>' : ''}</div></div>`,
+          )
+          .join('') || '<p>لا توجد محادثات في هذه القائمة.</p>';
+      $('queue')
+        .querySelectorAll('[data-open]')
+        .forEach((b) => (b.onclick = () => open(b.dataset.open)));
+      $('queue')
+        .querySelectorAll('[data-claim]')
+        .forEach(
+          (b) =>
+            (b.onclick = async () => {
+              try {
+                await api('/chat/' + b.dataset.claim + '/action', 'POST', {
+                  action: 'claim',
+                  revision: Number(b.dataset.revision),
+                });
+                await open(b.dataset.claim);
+                await queue();
+              } catch (e) {
+                $('queue-count').textContent = e.message;
+              }
+            }),
+        );
+      $('prev').disabled = listPage <= 1;
+      $('next').disabled = listPage >= r.pages;
+    } catch (e) {
+      if (requestId === queueSequence) $('queue-count').textContent = e.message;
+    }
+  }
+  async function open(id) {
+    if (busy) {
+      $('error').textContent = 'انتظر انتهاء الإرسال قبل تغيير المحادثة';
+      return;
+    }
+    active = id;
+    conversation = null;
+    linkedOrder = null;
+    messages = [];
+    more = false;
+    nonce = null;
+    $('text').value = '';
+    renderMeta();
+    renderMessages();
+    await refresh();
+  }
+  function onVisibleScroll() {
+    acknowledge(active, messages.at(-1)?.seq);
+  }
+  function bind() {
+    $('messages').onscroll = onVisibleScroll;
+    window.addEventListener('scroll', onVisibleScroll, true);
+    window.addEventListener('focus', onVisibleScroll);
+    document.addEventListener('visibilitychange', onVisibleScroll);
+    $('text').oninput = () => {
+      nonce = null;
+      fitCompose();
+    };
+    if (desk)
+      $('internal').onchange = () => {
+        nonce = null;
+      };
+    $('compose').onsubmit = async (e) => {
+      e.preventDefault();
+      if (busy || (desk && !active)) return;
+      busy = true;
+      $('send').disabled = true;
+      const message = $('text').value;
+      nonce ??= crypto.randomUUID();
+      $('text').disabled = true;
+      try {
+        if (!active) {
+          const r = await api('/chat', 'POST', {
+            message,
+            client_id: nonce,
+            order_id: $('order').value || null,
+          });
+          active = r.id;
+          $('order').disabled = true;
+        } else
+          await api('/chat/' + active + '/messages', 'POST', {
+            message,
+            client_id: nonce,
+            internal: desk && $('internal').checked,
+          });
+        $('text').value = '';
+        nonce = null;
+        await refresh();
+        if (!desk) await customerList();
+        else await queue();
+      } catch (err) {
+        $('error').textContent = err.message;
+      } finally {
+        busy = false;
+        $('text').disabled = conversation?.status === 'closed';
+        $('send').disabled = conversation?.status === 'closed';
+      }
+    };
+    $('refresh').onclick = async () => {
+      await refresh();
+      if (desk) await queue();
+      else await customerList();
+    };
+    $('older').onclick = () => refresh(true);
+  }
+  async function boot() {
+    try {
+      ({ user } = await api('/session'));
+      if (desk) {
+        if (!user || !['owner', 'admin', 'support'].includes(user.role)) {
+          document.getElementById('chat-desk').innerHTML =
+            '<p>الدخول للفريق فقط. <a href="/login">تسجيل الدخول</a></p>';
+          return;
+        }
+        manager = ['owner', 'admin'].includes(user.role);
+        document.getElementById('chat-desk').innerHTML =
+          `<div class="chat-desk-grid"><section class="panel"><h2>صندوق الدعم</h2><label>القائمة <select id="rc-queue-mode"><option value="open">المفتوحة</option><option value="all">كل الحالات</option><option value="closed">المغلقة</option>${manager ? '<option value="escalated">المصعّدة للإدارة</option>' : ''}</select></label><form id="rc-queue-search" class="chat-search"><label>البحث بالمحادثات<input name="q" maxlength="200" placeholder="الاسم، الإيميل، رقم الطلب أو المحادثة"></label><label>الأولوية<select name="priority"><option value="">كل الأولويات</option><option value="urgent">عاجلة</option><option value="normal">عادية</option></select></label><label>الإسناد<select name="assignee"><option value="">الكل ضمن صلاحياتي</option><option value="mine">المسندة لي</option><option value="unassigned">غير المسندة</option></select></label><div class="chat-controls"><button class="primary" type="submit">بحث</button><button class="secondary" type="button" id="rc-clear-search">مسح الفلاتر</button></div></form><p id="rc-queue-count" role="status"></p><div id="rc-queue" class="chat-queue"></div><div class="chat-controls"><button id="rc-prev" class="secondary">السابق</button><button id="rc-next" class="secondary">التالي</button></div><a href="/admin">بحث الطلبات ولوحة العمل ←</a></section><section class="panel">${shell()}</section></div>`;
+        bind();
+        $('send').disabled = true;
+        $('queue-mode').onchange = () => {
+          listPage = 1;
+          queue();
+        };
+        $('prev').onclick = () => {
+          listPage--;
+          queue();
+        };
+        $('next').onclick = () => {
+          listPage++;
+          queue();
+        };
+        $('queue-search').onsubmit = (e) => {
+          e.preventDefault();
+          const f = e.target;
+          queueFilter = {
+            q: f.elements.q.value,
+            priority: f.elements.priority.value,
+            assignee: f.elements.assignee.value,
+          };
+          listPage = 1;
+          queue();
+        };
+        $('clear-search').onclick = () => {
+          queueFilter = { q: '', priority: '', assignee: '' };
+          for (const k of Object.keys(queueFilter)) $('queue-search').elements[k].value = '';
+          $('queue-mode').value = 'open';
+          listPage = 1;
+          queue();
+        };
+        await queue();
+        const { mountChatTools } = await import('/chat-tools-ui.js');
+        toolsUI = await mountChatTools($('tools'), {
+          api,
+          manager,
+          getConversation: () => conversation,
+          getText: () => $('text').value,
+          isBusy: () => busy,
+          onStaffList: (staff) => {
+            const select = $('queue-search').elements.assignee,
+              selected = select.value;
+            select.innerHTML =
+              '<option value="">الكل ضمن صلاحياتي</option><option value="mine">المسندة لي</option><option value="unassigned">غير المسندة</option>' +
+              staff
+                .map(
+                  (u) =>
+                    '<option value="' +
+                    esc(u.id) +
+                    '">' +
+                    esc(u.name) +
+                    ' · ' +
+                    esc(u.email) +
+                    '</option>',
+                )
+                .join('');
+            if (
+              selected &&
+              !['mine', 'unassigned'].includes(selected) &&
+              !staff.some((u) => u.id === selected)
+            ) {
+              const option = document.createElement('option');
+              option.value = selected;
+              option.textContent = selected + ' (غير متاح حاليًا)';
+              select.append(option);
+            }
+            select.value = selected;
+          },
+          setText: (value) => {
+            $('text').value = value;
+            nonce = null;
+            $('text').focus();
+          },
+          onAction: (kind, extra) => action(kind, undefined, extra),
+        });
+        toolsUI.update(conversation);
+      } else {
+        if (user && user.role !== 'customer') return;
+        if (
+          !['/', '/index.html', '/account', '/order.html', '/payment.html'].includes(
+            location.pathname,
+          )
+        )
+          return;
+        const launch = document.createElement('button');
+        launch.className = 'rivo-chat-launch';
+        launch.textContent = 'اسأل ريفو';
+        launch.type = 'button';
+        document.body.append(launch);
+        launcher = launch;
+        const dialog = document.createElement('dialog');
+        dialog.className = 'rivo-chat-dialog';
+        dialog.setAttribute('aria-label', 'محادثة دعم ريفو');
+        dialog.setAttribute('dir', 'rtl');
+        dialog.innerHTML =
+          '<div id="ra-assistant"></div><div id="ra-human" hidden>' +
+          (user ? shell() : '') +
+          '</div>';
+        document.body.append(dialog);
+        const botRoot = document.getElementById('ra-assistant'),
+          humanRoot = document.getElementById('ra-human');
+        const { mountAssistant } = await import('/assistant-ui.js');
+        const bot = mountAssistant(botRoot, {
+          request: (b) => api('/assistant', 'POST', b),
+          onClose: () => dialog.close(),
+          onHuman: async (summary) => {
+            if (busy) throw new Error('انتظر انتهاء إرسال الرسالة الحالية');
+            if (!user) {
+              location.assign('/login');
+              return;
+            }
+            botRoot.hidden = true;
+            humanRoot.hidden = false;
+            await customerList();
+            if (summary && !$('text').value.trim()) {
+              $('text').value = 'ملخص المساعد الآلي — راجعه وعدّله قبل الإرسال:\n\n' + summary;
+              nonce = null;
+            }
+            fitCompose();
+            $('text').focus();
+          },
+        });
+        botUI = bot;
+        launch.onclick = () => {
+          dialog.showModal();
+          bot.start();
+        };
+        if (!user) return;
+        async function summaryTick() {
+          await refreshSummary();
+          summaryTimer = setTimeout(summaryTick, 30000);
+        }
+        summaryTick();
+        window.addEventListener('pagehide', () => clearTimeout(summaryTimer));
+        document.getElementById('ra-back').onclick = () => {
+          humanRoot.hidden = true;
+          botRoot.hidden = false;
+          bot.start();
+        };
+        const history = document.createElement('select');
+        history.id = 'rc-history';
+        history.setAttribute('aria-label', 'المحادثات السابقة');
+        $('meta').before(history);
+        const label = document.createElement('label');
+        label.className = 'chat-meta';
+        label.textContent = 'الطلب المرتبط (اختياري) ';
+        const order = document.createElement('select');
+        order.id = 'rc-order';
+        order.innerHTML = '<option value="">استفسار عام</option>';
+        label.append(order);
+        history.after(label);
+        bind();
+        $('close').onclick = () => dialog.close();
+        history.onchange = () => {
+          if (history.value) open(history.value);
+        };
+        let r;
+        try {
+          r = await api('/orders');
+        } catch {
+          r = { orders: [] };
+          $('error').textContent = 'تعذّر تحميل طلباتك؛ يمكنك إرسال استفسار عام.';
+        }
+        for (const o of r.orders) {
+          const option = document.createElement('option');
+          option.value = o.id;
+          option.textContent =
+            '#' + o.id.slice(0, 8) + ' · ' + o.items.map((i) => i.name).join('، ');
+          order.append(option);
+        }
+        const linked = new URLSearchParams(location.search).get('order');
+        if (!active && r.orders.some((o) => o.id === linked)) order.value = linked;
+        bind();
+        $('close').onclick = () => dialog.close();
+        history.onchange = () => {
+          if (history.value) open(history.value);
+        };
+        launch.onclick = async () => {
+          dialog.showModal();
+          bot.start();
+          if (!humanRoot.hidden) {
+            try {
+              await customerList();
+            } catch (e) {
+              $('error').textContent = e.message;
+            }
+          }
+        };
+        renderMeta();
+        renderMessages();
+      }
+      async function tick() {
+        if (
+          !document.hidden &&
+          (desk || document.querySelector('.rivo-chat-dialog[open] #ra-human:not([hidden])'))
+        ) {
+          await refresh();
+          if (desk) await queue();
+        }
+        timer = setTimeout(tick, 12000);
+      }
+      timer = setTimeout(tick, 12000);
+      window.addEventListener('pagehide', () => clearTimeout(timer));
+    } catch (e) {
+      if (desk) document.getElementById('chat-desk').textContent = e.message;
+    }
+  }
+  boot();
 })();

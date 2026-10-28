@@ -1,37 +1,175 @@
-const RivoAdminOrders=(()=>{
- let state={q:'',status:'',payment:'',method:'',mode:'all',attention:'',from:'',to:'',page:1},sequence=0;
- const names={waiting:'مدفوعة بانتظار التنفيذ',supplier:'تعذّر التنفيذ لدى المورد',review:'تحتاج مراجعة'};
- const opts=(values,value)=>values.map(([key,label])=>`<option value="${esc(key)}" ${key===value?'selected':''}>${esc(label)}</option>`).join('');
- function cards(counts){return `<div class="order-alerts">${Object.entries(names).map(([key,label])=>`<button type="button" class="order-alert ${state.attention===key?'chosen':''}" data-attention="${key}"><span>${label}</span><strong>${counts[key]??'—'}</strong><small>عرض الطلبات ←</small></button>`).join('')}</div><p class="helper">تنبيهات داخل اللوحة حسب آخر تحديث، تستثني الطلبات التجريبية. قد يظهر الطلب في أكثر من تنبيه. الاسترجاع يحتاج مراجعة ولا يعني وجود خطأ.</p>`}
- function bindCards(root){root.querySelectorAll('[data-attention]').forEach(b=>b.onclick=()=>{state={q:'',status:'',payment:'',method:'',mode:'live',attention:b.dataset.attention,from:'',to:'',page:1};if(current==='orders'){history.replaceState({},'','#orders');render();}else location.hash='orders';});}
- async function overviewAlerts(){const target=$('admin-order-alerts');if(!target)return;target.innerHTML='<p class="helper">جاري فحص الطلبات التي تحتاج متابعة…</p>';try{const d=await api('/api/admin/orders/alerts');if($('admin-order-alerts')!==target)return;target.innerHTML=cards(d.counts);bindCards(target)}catch(e){target.textContent=e.message}}
- function table(orders){return `<div class="table-wrap support-order-table"><table><thead><tr><th>الطلب / التاريخ</th><th>الزبون</th><th>المنتجات / اللاعب</th><th>الإجمالي</th><th>الدفع والتنفيذ</th><th>الإجراءات</th></tr></thead><tbody>${orders.map(o=>`<tr><td><button class="text-btn" onclick="editOrder('${o.id}')"><b>#${o.id.slice(0,8)}</b></button><small>${date(o.created_at)}</small><button class="text-btn" onclick="RivoAdminOrders.copy('${o.id}')">نسخ الرقم الكامل</button></td><td><b>${esc(o.customer_name)}</b><small dir="ltr">${esc(o.customer_email)}</small></td><td>${o.items.slice(0,2).map(i=>`<div>${esc(i.name)} × ${i.quantity}</div>`).join('')}${o.items.length>2?'<small>ومنتجات أخرى</small>':''}${o.player_id?'<small>اللاعب: <bdi>'+esc(o.player_id)+'</bdi></small>':''}</td><td>${esc(money(o.total_cents,o.currency))}<small>${labels[o.payment_method]}</small></td><td>${badge(o.payment_status)} ${o.payment_status.startsWith('test_')?'<span class="badge purple">اختبار مكتمل</span>':badge(o.status)}${o.supplier_jobs?.some(j=>j.error||['failed','action_required','cancelled','refunded'].includes(j.status))?'<small class="support-warning">راجع نتيجة المورد</small>':''}</td><td><button class="secondary" onclick="editOrder('${o.id}')">فتح الطلب</button></td></tr>`).join('')}</tbody></table></div>`}
- async function load(){
-  const ticket=++sequence,target=$('order-search-results');if(!target)return;
-  target.innerHTML='<p class="helper" role="status">جاري البحث في جميع الطلبات…</p>';
-  const params=new URLSearchParams();for(const [k,v] of Object.entries(state))if(v)params.set(k,v);
-  try{const [d,a]=await Promise.all([api('/api/admin/orders?'+params),api('/api/admin/orders/alerts')]);if(ticket!==sequence||$('order-search-results')!==target)return;
-   $('order-alerts').innerHTML=cards(a.counts);bindCards($('order-alerts'));
-   target.innerHTML=`<div class="support-results-head"><p role="status">${d.total} طلب مطابق · الصفحة ${d.page} من ${Math.max(1,d.pages)}</p><small>آخر فحص: ${date(d.checked_at)}</small></div>${d.orders.length?table(d.orders):empty('ما لقينا طلبات مطابقة','راجع رقم الطلب أو خفّف الفلاتر. البحث يشمل كل الطلبات، حتى الأقدم من آخر 300.')}<div class="support-pagination"><button id="orders-prev" class="secondary" ${d.page<=1?'disabled':''}>السابق</button><button id="orders-next" class="secondary" ${d.page>=d.pages?'disabled':''}>التالي</button></div>`;
-   $('orders-prev').onclick=()=>{state.page--;load()};$('orders-next').onclick=()=>{state.page++;load()};
-  }catch(e){if(ticket===sequence&&$('order-search-results')===target)target.innerHTML=`<p class="form-error" role="alert">${esc(e.message)}</p>`}
- }
- function render(){
-  const deep=new URLSearchParams(location.hash.split('?')[1]||'').get('q');if(deep)state.q=deep;
-  $('dash-view').innerHTML=`<div class="page-head"><div><h2>الطلبات ومتابعة الزبائن</h2><p>ابحث عن الطلب من البيانات المتوفرة مع الزبون، ثم افتح تفاصيله.</p></div><button id="orders-refresh" class="secondary">تحديث النتائج والتنبيهات</button></div><section id="order-alerts"></section><section class="panel"><form id="order-search-form" class="support-search"><label class="field full">ابحث برقم الطلب، رابط الطلب، اسم الزبون، الإيميل، معرّف اللاعب، المنتج أو معرّف فاتورة Payunit<input name="q" value="${esc(state.q)}" maxlength="200" placeholder="مثال: #a12442c9 أو بريد الزبون" autocomplete="off"></label><p class="helper support-wide">يمكنك الجمع بين كلمات مثل اسم الزبون واسم المنتج. رقم الطلب المختصر قد يطابق أكثر من طلب؛ تأكد من الإيميل والمنتجات قبل أي تعديل. لا تُستخدم أكواد التسليم أو الملاحظات الخاصة كمجال بحث.</p>
-  ${select('حالة التنفيذ','status',state.status,[['','كل الحالات'],...['contact_pending','awaiting_payment','processing','completed','cancelled'].map(v=>[v,labels[v]])])}
-  ${select('حالة الدفع','payment',state.payment,[['','كل حالات الدفع'],...['unpaid','paid','refunded','partially_refunded','test_paid','test_refunded','test_partially_refunded'].map(v=>[v,labels[v]])])}
-  ${select('طريقة الطلب','method',state.method,[['','الكل'],['whatsapp','واتساب'],['gateway','Payunit']])}
-  <label class="field">نوع الطلب<select name="mode">${opts([['all','الحقيقي والتجريبي'],['live','الحقيقي فقط'],['test','التجريبي فقط']],state.mode)}</select></label>
-  <label class="field">المتابعة<select name="attention">${opts([['','كل الطلبات'],...Object.entries(names)],state.attention)}</select></label>
+const RivoAdminOrders = (() => {
+  let state = {
+      q: '',
+      status: '',
+      payment: '',
+      method: '',
+      mode: 'all',
+      attention: '',
+      from: '',
+      to: '',
+      page: 1,
+    },
+    sequence = 0;
+  const names = {
+    waiting: 'مدفوعة بانتظار التنفيذ',
+    supplier: 'تعذّر التنفيذ لدى المورد',
+    review: 'تحتاج مراجعة',
+  };
+  const opts = (values, value) =>
+    values
+      .map(
+        ([key, label]) =>
+          `<option value="${esc(key)}" ${key === value ? 'selected' : ''}>${esc(label)}</option>`,
+      )
+      .join('');
+  function cards(counts) {
+    return `<div class="order-alerts">${Object.entries(names)
+      .map(
+        ([key, label]) =>
+          `<button type="button" class="order-alert ${state.attention === key ? 'chosen' : ''}" data-attention="${key}"><span>${label}</span><strong>${counts[key] ?? '—'}</strong><small>عرض الطلبات ←</small></button>`,
+      )
+      .join(
+        '',
+      )}</div><p class="helper">تنبيهات داخل اللوحة حسب آخر تحديث، تستثني الطلبات التجريبية. قد يظهر الطلب في أكثر من تنبيه. الاسترجاع يحتاج مراجعة ولا يعني وجود خطأ.</p>`;
+  }
+  function bindCards(root) {
+    root.querySelectorAll('[data-attention]').forEach(
+      (b) =>
+        (b.onclick = () => {
+          state = {
+            q: '',
+            status: '',
+            payment: '',
+            method: '',
+            mode: 'live',
+            attention: b.dataset.attention,
+            from: '',
+            to: '',
+            page: 1,
+          };
+          if (current === 'orders') {
+            history.replaceState({}, '', '#orders');
+            render();
+          } else location.hash = 'orders';
+        }),
+    );
+  }
+  async function overviewAlerts() {
+    const target = $('admin-order-alerts');
+    if (!target) return;
+    target.innerHTML = '<p class="helper">جاري فحص الطلبات التي تحتاج متابعة…</p>';
+    try {
+      const d = await api('/api/admin/orders/alerts');
+      if ($('admin-order-alerts') !== target) return;
+      target.innerHTML = cards(d.counts);
+      bindCards(target);
+    } catch (e) {
+      target.textContent = e.message;
+    }
+  }
+  function table(orders) {
+    return `<div class="table-wrap support-order-table"><table><thead><tr><th>الطلب / التاريخ</th><th>الزبون</th><th>المنتجات / اللاعب</th><th>الإجمالي</th><th>الدفع والتنفيذ</th><th>الإجراءات</th></tr></thead><tbody>${orders
+      .map(
+        (o) =>
+          `<tr><td><button class="text-btn" onclick="editOrder('${o.id}')"><b>#${o.id.slice(0, 8)}</b></button><small>${date(o.created_at)}</small><button class="text-btn" onclick="RivoAdminOrders.copy('${o.id}')">نسخ الرقم الكامل</button></td><td><b>${esc(o.customer_name)}</b><small dir="ltr">${esc(o.customer_email)}</small></td><td>${o.items
+            .slice(0, 2)
+            .map(
+              (i) =>
+                `<div>${esc(i.name)} × ${i.quantity}${i.player_id ? '<small>الحساب: <bdi>' + esc(i.player_id) + '</bdi></small>' : ''}</div>`,
+            )
+            .join(
+              '',
+            )}${o.items.length > 2 ? '<small>ومنتجات أخرى</small>' : ''}${o.player_id ? '<small>اللاعب: <bdi>' + esc(o.player_id) + '</bdi></small>' : ''}</td><td>${esc(money(o.total_cents, o.currency))}<small>${labels[o.payment_method]}</small></td><td>${badge(o.payment_status)} ${o.payment_status.startsWith('test_') ? '<span class="badge purple">اختبار مكتمل</span>' : badge(o.status)}${o.supplier_jobs?.some((j) => j.error || ['failed', 'action_required', 'cancelled', 'refunded'].includes(j.status)) ? '<small class="support-warning">راجع نتيجة المورد</small>' : ''}</td><td><button class="secondary" onclick="editOrder('${o.id}')">فتح الطلب</button></td></tr>`,
+      )
+      .join('')}</tbody></table></div>`;
+  }
+  async function load() {
+    const ticket = ++sequence,
+      target = $('order-search-results');
+    if (!target) return;
+    target.innerHTML = '<p class="helper" role="status">جاري البحث في جميع الطلبات…</p>';
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(state)) if (v) params.set(k, v);
+    try {
+      const [d, a] = await Promise.all([
+        api('/api/admin/orders?' + params),
+        api('/api/admin/orders/alerts'),
+      ]);
+      if (ticket !== sequence || $('order-search-results') !== target) return;
+      $('order-alerts').innerHTML = cards(a.counts);
+      bindCards($('order-alerts'));
+      target.innerHTML = `<div class="support-results-head"><p role="status">${d.total} طلب مطابق · الصفحة ${d.page} من ${Math.max(1, d.pages)}</p><small>آخر فحص: ${date(d.checked_at)}</small></div>${d.orders.length ? table(d.orders) : empty('ما لقينا طلبات مطابقة', 'راجع رقم الطلب أو خفّف الفلاتر. البحث يشمل كل الطلبات، حتى الأقدم من آخر 300.')}<div class="support-pagination"><button id="orders-prev" class="secondary" ${d.page <= 1 ? 'disabled' : ''}>السابق</button><button id="orders-next" class="secondary" ${d.page >= d.pages ? 'disabled' : ''}>التالي</button></div>`;
+      $('orders-prev').onclick = () => {
+        state.page--;
+        load();
+      };
+      $('orders-next').onclick = () => {
+        state.page++;
+        load();
+      };
+    } catch (e) {
+      if (ticket === sequence && $('order-search-results') === target)
+        target.innerHTML = `<p class="form-error" role="alert">${esc(e.message)}</p>`;
+    }
+  }
+  function render() {
+    const deep = new URLSearchParams(location.hash.split('?')[1] || '').get('q');
+    if (deep) state.q = deep;
+    $('dash-view').innerHTML =
+      `<div class="page-head"><div><h2>الطلبات ومتابعة الزبائن</h2><p>ابحث عن الطلب من البيانات المتوفرة مع الزبون، ثم افتح تفاصيله.</p></div><button id="orders-refresh" class="secondary">تحديث النتائج والتنبيهات</button></div><section id="order-alerts"></section><section class="panel"><form id="order-search-form" class="support-search"><label class="field full">ابحث برقم الطلب، رابط الطلب، اسم الزبون، الإيميل، معرّف اللاعب، المنتج أو معرّف فاتورة Payunit<input name="q" value="${esc(state.q)}" maxlength="200" placeholder="مثال: #a12442c9 أو بريد الزبون" autocomplete="off"></label><p class="helper support-wide">يمكنك الجمع بين كلمات مثل اسم الزبون واسم المنتج. رقم الطلب المختصر قد يطابق أكثر من طلب؛ تأكد من الإيميل والمنتجات قبل أي تعديل. لا تُستخدم أكواد التسليم أو الملاحظات الخاصة كمجال بحث.</p>
+  ${select('حالة التنفيذ', 'status', state.status, [['', 'كل الحالات'], ...['contact_pending', 'awaiting_payment', 'processing', 'completed', 'cancelled'].map((v) => [v, labels[v]])])}
+  ${select('حالة الدفع', 'payment', state.payment, [['', 'كل حالات الدفع'], ...['unpaid', 'paid', 'refunded', 'partially_refunded', 'test_paid', 'test_refunded', 'test_partially_refunded'].map((v) => [v, labels[v]])])}
+  ${select('طريقة الطلب', 'method', state.method, [
+    ['', 'الكل'],
+    ['whatsapp', 'واتساب'],
+    ['gateway', 'Payunit'],
+  ])}
+  <label class="field">نوع الطلب<select name="mode">${opts(
+    [
+      ['all', 'الحقيقي والتجريبي'],
+      ['live', 'الحقيقي فقط'],
+      ['test', 'التجريبي فقط'],
+    ],
+    state.mode,
+  )}</select></label>
+  <label class="field">المتابعة<select name="attention">${opts([['', 'كل الطلبات'], ...Object.entries(names)], state.attention)}</select></label>
   <label class="field">من تاريخ (UTC)<input name="from" type="date" value="${esc(state.from)}"></label><label class="field">إلى تاريخ (UTC)<input name="to" type="date" value="${esc(state.to)}"></label>
   <div class="support-wide order-actions"><button type="submit" class="primary">بحث في كل الطلبات</button><button id="orders-reset" class="secondary" type="button">مسح البحث والفلاتر</button></div></form><div id="order-search-results"></div></section>`;
-  $('order-search-form').onsubmit=e=>{e.preventDefault();state={...Object.fromEntries(new FormData(e.target)),page:1};if(location.hash.includes('?'))history.replaceState({},'','#orders');load()};
-  $('orders-refresh').onclick=load;
-  $('orders-reset').onclick=()=>{state={q:'',status:'',payment:'',method:'',mode:'all',attention:'',from:'',to:'',page:1};history.replaceState({},'','#orders');render()};
-  load();
- }
- async function copy(value){try{await navigator.clipboard.writeText(value);toast('تم النسخ')}catch{toast('تعذّر النسخ؛ حدّد الرقم الكامل من تفاصيل الطلب وانسخه يدويًا.')}}
- function extra(o){return `${o.support_notes?.length?'<section class="info-box"><h3>ملاحظات الدعم الداخلية</h3>'+o.support_notes.map(n=>'<p>'+esc(n.author)+' — '+esc(n.body)+'</p>').join('')+'</section>':''}<section class="support-detail"><label class="field">رقم الطلب الكامل<input readonly value="${esc(o.id)}" dir="ltr"></label><div class="order-actions"><button class="secondary" onclick="RivoAdminOrders.copy('${o.id}')">نسخ رقم الطلب</button><button class="secondary" onclick="RivoAdminOrders.copy(location.origin+'/order.html?order=${o.id}')">نسخ رابط الطلب للزبون</button><button class="secondary" onclick="RivoAdminOrders.copy(location.origin+'/admin#orders?q=${o.id}')">نسخ رابط البحث للأدمن</button></div><p class="helper">رابط الزبون يتطلب دخوله بحسابه. رابط الأدمن يتطلب صلاحية الإدارة.</p>${o.payment_reference?`<div class="info-box"><b>فاتورة Payunit</b><p class="support-mono">${esc(o.payment_reference.invoice_id||'لم تُنشأ بعد')}</p><p>البيئة: ${o.payment_reference.environment==='test'?'تجريبية':'حقيقية'} · الحالة: ${esc(o.payment_reference.status)}</p>${o.payment_reference.reference?'<p class="support-mono">'+esc(o.payment_reference.reference)+'</p>':''}</div>`:''}${o.supplier_jobs?.length?'<details><summary>متابعة عمليات المورد الحقيقية</summary>'+o.supplier_jobs.map(j=>'<div class="info-box"><p>الحالة: '+esc(j.status)+'</p><p class="support-mono">'+esc(j.remote_id||'لم يثبت رقم المورد بعد')+'</p>'+(j.error?'<p class="form-error">'+esc(j.error)+'</p>':'')+'</div>').join('')+'</details>':''}</section>`;}
- return {render,load,table,extra,copy,overviewAlerts};
+    $('order-search-form').onsubmit = (e) => {
+      e.preventDefault();
+      state = { ...Object.fromEntries(new FormData(e.target)), page: 1 };
+      if (location.hash.includes('?')) history.replaceState({}, '', '#orders');
+      load();
+    };
+    $('orders-refresh').onclick = load;
+    $('orders-reset').onclick = () => {
+      state = {
+        q: '',
+        status: '',
+        payment: '',
+        method: '',
+        mode: 'all',
+        attention: '',
+        from: '',
+        to: '',
+        page: 1,
+      };
+      history.replaceState({}, '', '#orders');
+      render();
+    };
+    load();
+  }
+  async function copy(value) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast('تم النسخ');
+    } catch {
+      toast('تعذّر النسخ؛ حدّد الرقم الكامل من تفاصيل الطلب وانسخه يدويًا.');
+    }
+  }
+  function extra(o) {
+    return `${o.support_notes?.length ? '<section class="info-box"><h3>ملاحظات الدعم الداخلية</h3>' + o.support_notes.map((n) => '<p>' + esc(n.author) + ' — ' + esc(n.body) + '</p>').join('') + '</section>' : ''}<section class="support-detail"><label class="field">رقم الطلب الكامل<input readonly value="${esc(o.id)}" dir="ltr"></label><div class="order-actions"><button class="secondary" onclick="RivoAdminOrders.copy('${o.id}')">نسخ رقم الطلب</button><button class="secondary" onclick="RivoAdminOrders.copy(location.origin+'/order.html?order=${o.id}')">نسخ رابط الطلب للزبون</button><button class="secondary" onclick="RivoAdminOrders.copy(location.origin+'/admin#orders?q=${o.id}')">نسخ رابط البحث للأدمن</button></div><p class="helper">رابط الزبون يتطلب دخوله بحسابه. رابط الأدمن يتطلب صلاحية الإدارة.</p>${o.payment_reference ? `<div class="info-box"><b>فاتورة Payunit</b><p class="support-mono">${esc(o.payment_reference.invoice_id || 'لم تُنشأ بعد')}</p><p>البيئة: ${o.payment_reference.environment === 'test' ? 'تجريبية' : 'حقيقية'} · الحالة: ${esc(o.payment_reference.status)}</p>${o.payment_reference.reference ? '<p class="support-mono">' + esc(o.payment_reference.reference) + '</p>' : ''}</div>` : ''}${o.supplier_jobs?.length ? '<details><summary>متابعة عمليات المورد الحقيقية</summary>' + o.supplier_jobs.map((j) => '<div class="info-box"><p>الحالة: ' + esc(j.status) + '</p><p class="support-mono">' + esc(j.remote_id || 'لم يثبت رقم المورد بعد') + '</p>' + (j.error ? '<p class="form-error">' + esc(j.error) + '</p>' : '') + '</div>').join('') + '</details>' : ''}</section>`;
+  }
+  return { render, load, table, extra, copy, overviewAlerts };
 })();
