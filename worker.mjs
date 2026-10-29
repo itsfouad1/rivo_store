@@ -1,3 +1,5 @@
+import { createOperations } from './lib/operations.mjs';
+import { publicDiscovery } from './lib/public-discovery.mjs';
 import { createFoxreload } from './lib/foxreload.mjs';
 import { createStoreHandler } from './lib/store-api.mjs';
 import { authService } from './lib/auth.mjs';
@@ -8,10 +10,18 @@ export default {
     try {
       const url = new URL(req.url),
         auth = authService(env.DB, env);
+      const discovery = await publicDiscovery(req, env.DB);
+      if (discovery) return discovery;
+      const operations = createOperations(env.DB, auth.identity);
+      const operationResponse = await operations.handle(req);
+      if (operationResponse) return auth.finish(operationResponse);
       const payment = createPayunit(env, auth.identity);
       const paymentResponse = await payment.handle(req);
       if (paymentResponse) return auth.finish(paymentResponse);
-      const supplierResponse = await createFoxreload(env, auth.identity).handle(req);
+      const supplierResponse = await createFoxreload(
+        { ...env, RIVO_OPERATIONS_ENABLED: true },
+        auth.identity,
+      ).handle(req);
       if (supplierResponse) return auth.finish(supplierResponse);
       const response = await auth.handle(req);
       if (response) return auth.finish(response);
@@ -28,6 +38,7 @@ export default {
             bucket: env.BUCKET,
             resolveIdentity: auth.identity,
             foxEnabled: true,
+            operationsEnabled: true,
             gatewayReady: payment.configured(),
             gatewayMode: payunitMode(env),
             ai: env.AI,
@@ -45,6 +56,22 @@ export default {
         headers.set('X-Content-Type-Options', 'nosniff');
         headers.set('Referrer-Policy', 'same-origin');
         headers.set('Content-Security-Policy', "frame-ancestors 'none'");
+        headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+        return new Response(r.body, { status: r.status, headers });
+      }
+      if (
+        [
+          '/dashboard.html',
+          '/order.html',
+          '/payment.html',
+          '/operations.html',
+          '/chat.html',
+        ].includes(url.pathname)
+      ) {
+        const r = await env.ASSETS.fetch(req),
+          headers = new Headers(r.headers);
+        headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+        headers.set('Cache-Control', 'no-store');
         return new Response(r.body, { status: r.status, headers });
       }
       return env.ASSETS.fetch(req);
@@ -60,7 +87,8 @@ export default {
     if (event.cron === '*/15 * * * *') {
       const results = await Promise.allSettled([
         ensureRates(env.DB),
-        createFoxreload(env).scheduled(),
+        createFoxreload({ ...env, RIVO_OPERATIONS_ENABLED: true }).scheduled(),
+        createOperations(env.DB).reconcile(),
       ]);
       for (const result of results)
         if (result.status === 'rejected')

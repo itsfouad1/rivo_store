@@ -1097,3 +1097,14 @@ td {
   background: #e9e8f0;
   flex: 1;
 }
+
+@media (min-width: 651px) {
+  .sidebar {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .sidebar > * {
+    flex-shrink: 0;
+  }
+}

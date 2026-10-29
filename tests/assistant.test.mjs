@@ -141,31 +141,27 @@ test('order answers require login and enforce ownership without exposing interna
 });
 test('unpublished policies and drafts are never used to invent refund conditions', async () => {
   const x = setup();
-  x.sql
-    .prepare('INSERT INTO settings VALUES (?,?)')
-    .run(
-      'policy:refunds',
-      JSON.stringify({
-        type: 'refunds',
-        revision: 1,
-        draft: { title: 'SECRET TITLE', body: 'SECRET DRAFT' },
-        published: null,
-      }),
-    );
+  x.sql.prepare('INSERT INTO settings VALUES (?,?)').run(
+    'policy:refunds',
+    JSON.stringify({
+      type: 'refunds',
+      revision: 1,
+      draft: { title: 'SECRET TITLE', body: 'SECRET DRAFT' },
+      published: null,
+    }),
+  );
   let r = await x.ask({ question: 'بدي استرجاع' });
   assert.equal(r.data.links.length, 0);
   assert.ok(!JSON.stringify(r.data).includes('SECRET'));
-  x.sql
-    .prepare('UPDATE settings SET value=? WHERE id=?')
-    .run(
-      JSON.stringify({
-        type: 'refunds',
-        revision: 2,
-        draft: { title: 'SECRET', body: 'SECRET' },
-        published: { title: 'سياسة معتمدة', body: 'real', version: 2, published_at: '2026' },
-      }),
-      'policy:refunds',
-    );
+  x.sql.prepare('UPDATE settings SET value=? WHERE id=?').run(
+    JSON.stringify({
+      type: 'refunds',
+      revision: 2,
+      draft: { title: 'SECRET', body: 'SECRET' },
+      published: { title: 'سياسة معتمدة', body: 'real', version: 2, published_at: '2026' },
+    }),
+    'policy:refunds',
+  );
   r = await x.ask({ intent: 'refunds' });
   assert.equal(r.data.links[0].title, 'سياسة معتمدة');
   assert.equal(r.data.links[0].url, '/policy.html?type=refunds');

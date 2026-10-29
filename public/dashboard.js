@@ -122,6 +122,10 @@ let nav = [
   ['overview', '⌘', 'نظرة عامة'],
   ['products', '▦', 'المنتجات'],
   ['orders', '▤', 'الطلبات'],
+  ['operations', '◎', 'متابعة الطلبات'],
+  ['reports', '◷', 'تقارير الربح'],
+  ['producthealth', '◇', 'مراجعة المنتجات'],
+  ['launch', '✓', 'تجهيز الإطلاق'],
   ['suppliers', '⇄', 'الموردون والربط'],
   ['foxreload', '↗', 'FoxReload'],
   ['policies', '≡', 'صفحات وسياسات المتجر'],
@@ -136,6 +140,10 @@ function renderAdmin() {
       !user.permissions ||
       user.permissions.includes(
         {
+          operations: 'orders_write',
+          reports: 'reports',
+          producthealth: 'products',
+          launch: 'settings',
           products: 'products',
           orders: 'orders_write',
           suppliers: 'suppliers',
@@ -152,6 +160,10 @@ function renderAdmin() {
   $('app').innerHTML =
     `<div class="admin-shell"><aside class="sidebar">${brand}<div class="side-label">إدارة المتجر</div><nav>${nav.map(([key, icon, title]) => `<a class="side-link ${key === current ? 'active' : ''}" href="#${key}"><span class="ico">${icon}</span>${title}</a>`).join('')}</nav><div class="side-bottom"><a class="side-link" href="/">↗ معاينة المتجر</a><a class="side-link" href="/account">◇ حسابي كزبون</a><a class="side-link" href="/login" data-logout target="_top">← تسجيل الخروج</a></div><div class="side-profile"><b>${esc(user.name)}</b>${esc(user.email)} <span class="admin-chip">مدير</span></div></aside><main class="admin-main"><div class="dash-topbar"><div><h1>${nav.find((x) => x[0] === current)[2]}</h1><p>RIVO / لوحة الإدارة</p></div><div class="top-user"><span class="badge purple">حساب الإدارة</span><span class="avatar">${esc(user.name.slice(0, 1))}</span><a class="link-btn" href="/">المتجر ↗</a><a class="link-btn" target="_top" href="/login" data-logout>خروج</a></div></div><div class="dash-content" id="dash-view"></div></main></div>`;
   ({
+    operations: () => RivoOperations.render('operations'),
+    reports: () => RivoOperations.render('reports'),
+    producthealth: () => RivoOperations.render('producthealth'),
+    launch: () => RivoOperations.render('launch'),
     overview: overview,
     products: productsView,
     orders: ordersView,
@@ -202,10 +214,11 @@ function productRows() {
   const list = visibleProducts(),
     allSelected = list.length > 0 && list.every((p) => selectedProducts.has(p.id));
   $('product-bulk').innerHTML =
-    `<span class="helper">تم تحديد ${selectedProducts.size} منتج</span><button class="primary" id="bulk-publish" ${selectedProducts.size ? '' : 'disabled'}>نشر المحدد</button><button class="danger" id="bulk-delete" ${selectedProducts.size ? '' : 'disabled'}>حذف المحدد</button>`;
+    `<span class="helper">تم تحديد ${selectedProducts.size} منتج</span><button class="primary" id="bulk-publish" ${selectedProducts.size ? '' : 'disabled'}>نشر المحدد</button><button class="secondary" id="bulk-edit" ${selectedProducts.size ? '' : 'disabled'}>تعديل المحدد</button><button class="danger" id="bulk-delete" ${selectedProducts.size ? '' : 'disabled'}>حذف المحدد</button>`;
   $('product-table').innerHTML = list.length
-    ? `<div class="table-wrap"><table><thead><tr><th><input id="select-all-products" type="checkbox" aria-label="تحديد كل المنتجات الظاهرة" ${allSelected ? 'checked' : ''}></th><th>المنتج</th><th>التصنيف</th><th>السعر</th><th>طريقة الطلب</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>${list.map((p) => `<tr><td><input class="product-select" type="checkbox" data-product-id="${p.id}" aria-label="تحديد ${esc(p.name)}" ${selectedProducts.has(p.id) ? 'checked' : ''}></td><td><div class="table-product"><span class="mini-cover">${p.image_url ? `<img src="${esc(p.image_url)}" alt="">` : esc(p.name.slice(0, 2))}</span><div><b>${esc(p.name)}</b><small>${esc(p.slug)}</small></div></div></td><td>${esc(p.category)}</td><td>${esc(money(p.price_cents, p.currency))}</td><td>${badge(p.payment_mode)}</td><td>${badge(p.status)}</td><td><div class="row-actions"><button onclick="editProduct('${p.id}')">تعديل</button>${p.status !== 'archived' ? `<button onclick="archiveProduct('${p.id}')">أرشفة</button>` : ''}<button class="danger" onclick="deleteProduct('${p.id}')">حذف</button></div></td></tr>`).join('')}</tbody></table></div>`
+    ? `<div class="table-wrap"><table><thead><tr><th><input id="select-all-products" type="checkbox" aria-label="تحديد كل المنتجات الظاهرة" ${allSelected ? 'checked' : ''}></th><th>المنتج</th><th>التصنيف</th><th>السعر</th><th>طريقة الطلب</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>${list.map((p) => `<tr><td><input class="product-select" type="checkbox" data-product-id="${p.id}" aria-label="تحديد ${esc(p.name)}" ${selectedProducts.has(p.id) ? 'checked' : ''}></td><td><div class="table-product"><span class="mini-cover">${p.image_url ? `<img src="${esc(p.image_url)}" alt="" loading="lazy" decoding="async">` : esc(p.name.slice(0, 2))}</span><div><b>${esc(p.name)}</b><small>${esc(p.slug)}</small></div></div></td><td>${esc(p.category)}</td><td>${esc(money(p.price_cents, p.currency))}</td><td>${badge(p.payment_mode)}</td><td>${badge(p.status)}</td><td><div class="row-actions"><button onclick="editProduct('${p.id}')">تعديل</button>${p.status !== 'archived' ? `<button onclick="archiveProduct('${p.id}')">أرشفة</button>` : ''}<button class="danger" onclick="deleteProduct('${p.id}')">حذف</button></div></td></tr>`).join('')}</tbody></table></div>`
     : empty('ما في منتجات مطابقة', 'جرّب تغيير البحث أو أضف منتجك الأول.');
+  $('bulk-edit').onclick = () => RivoOperations.bulk();
   $('bulk-publish').onclick = () => bulkProductAction('publish');
   $('bulk-delete').onclick = () => bulkProductAction('delete');
   $('select-all-products')?.addEventListener('change', (e) => {

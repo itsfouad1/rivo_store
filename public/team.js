@@ -27,7 +27,7 @@ async function teamView() {
                     ['support', 'دعم فني'],
                     ['admin', 'أدمن'],
                   ],
-                )}<p>الأدمن فقط يستخدم الصلاحيات التالية. الدعم يملك بحث الطلبات وملاحظات الدعم فقط.</p>${r.permissions.map((p) => `<label class="check-field"><input type="checkbox" name="permissions" value="${p}" ${perms.includes(p) ? 'checked' : ''}>${{ products: 'المنتجات', orders_write: 'إدارة الطلبات وتأكيد الدفع اليدوي', settings: 'إعدادات المتجر', suppliers: 'الموردون وتنفيذ الطلبات', policies: 'نشر السياسات' }[p]}</label>`).join('')}<label><input name="active" type="checkbox" ${u.active ? 'checked' : ''}>تفعيل وصول الموظف</label>${formEnd('حفظ الصلاحيات')}</form>`,
+                )}<p>الأدمن فقط يستخدم الصلاحيات التالية. الدعم يملك بحث الطلبات وملاحظات الدعم فقط.</p>${r.permissions.map((p) => `<label class="check-field"><input type="checkbox" name="permissions" value="${p}" ${perms.includes(p) ? 'checked' : ''}>${{ products: 'المنتجات', orders_write: 'إدارة الطلبات وتأكيد الدفع اليدوي', settings: 'إعدادات المتجر', suppliers: 'الموردون وتنفيذ الطلبات', policies: 'نشر السياسات', reports: 'تقارير الإيرادات والتكاليف المسجلة' }[p]}</label>`).join('')}<label><input name="active" type="checkbox" ${u.active ? 'checked' : ''}>تفعيل وصول الموظف</label>${formEnd('حفظ الصلاحيات')}</form>`,
               );
               bindForm('team-form', async (fd) => {
                 await send('/api/admin/team/' + encodeURIComponent(u.id), 'PUT', {
@@ -53,7 +53,7 @@ async function teamView() {
 }
 async function supportView() {
   $('app').innerHTML =
-    `<header class="customer-header"><div class="wrap topbar">${brand}<a href="/account">حسابي</a><a href="/login" data-logout>خروج</a></div></header><main class="customer-wrap"><section class="panel"><h1>مكتب الدعم</h1><p><a class="primary" href="/chat.html">المحادثات وقائمة الانتظار ←</a></p><p>ابحث برقم الطلب أو رابط الطلب أو اسم الزبون أو إيميله أو اللاعب أو المنتج.</p><form id="support-search"><input name="q" maxlength="200" placeholder="بيانات الطلب أو الزبون"><button class="primary">بحث</button></form><p id="support-error" role="alert"></p><div id="support-results"></div><button id="support-next" class="secondary" hidden>المزيد</button></section></main>`;
+    `<header class="customer-header"><div class="wrap topbar">${brand}<a href="/account">حسابي</a><a href="/login" data-logout>خروج</a></div></header><main class="customer-wrap"><section class="panel"><h1>مكتب الدعم</h1><p><a class="secondary" href="/operations.html">متابعة الطلبات والتصعيد للإدارة ←</a></p><p><a class="primary" href="/chat.html">المحادثات وقائمة الانتظار ←</a></p><p>ابحث برقم الطلب أو رابط الطلب أو اسم الزبون أو إيميله أو اللاعب أو المنتج.</p><form id="support-search"><input name="q" maxlength="200" placeholder="بيانات الطلب أو الزبون"><button class="primary">بحث</button></form><p id="support-error" role="alert"></p><div id="support-results"></div><button id="support-next" class="secondary" hidden>المزيد</button></section></main>`;
   let q = '',
     page = 1;
   async function load(append = false) {

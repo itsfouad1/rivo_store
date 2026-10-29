@@ -145,7 +145,7 @@ function art(p, button = false) {
           : name.includes('xbox')
             ? 'xbox'
             : 'pass';
-  return `<${button ? 'button' : 'div'} class="product-cover cover-${skin}" ${button ? `data-view="${p.id}" aria-label="تفاصيل ${esc(p.name)}"` : ''}>${p.image_url ? `<img src="${esc(p.image_url)}" class="product-img" alt="${esc(p.name)}">` : `<span class="art-icon">✦</span><strong>${esc(p.name.slice(0, 24))}</strong><small>RIVO DIGITAL</small>`}</${button ? 'button' : 'div'}>`;
+  return `<${button ? 'button' : 'div'} class="product-cover cover-${skin}" ${button ? `data-view="${p.id}" aria-label="تفاصيل ${esc(p.name)}"` : ''}>${p.image_url ? `<img src="${esc(p.image_url)}" class="product-img" loading="lazy" decoding="async" alt="${esc(p.name)}">` : `<span class="art-icon">✦</span><strong>${esc(p.name.slice(0, 24))}</strong><small>RIVO DIGITAL</small>`}</${button ? 'button' : 'div'}>`;
 }
 function filters() {
   const regions = [...new Set(products.map((p) => p.region).filter(Boolean))].sort((a, b) =>
