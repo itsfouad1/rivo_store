@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filterProducts, availability } from '../public/catalog.js';
+import { filterProducts, availability, catalogPage, featuredProducts } from '../public/catalog.js';
 const products = [
   {
     id: 'a',
@@ -63,4 +63,35 @@ test('sorting does not mutate the source catalog and empty price bounds do not b
     ['a', 'b', 'c'],
   );
   assert.deepEqual(filterProducts(products, { min: 20, max: 10 }), []);
+});
+
+test('pagination applies after global filtering and sorting, clamps stale pages', () => {
+  const items = Array.from({ length: 31 }, (_, i) => ({
+    ...products[0],
+    id: String(i),
+    price_cents: i * 100,
+  }));
+  const filtered = filterProducts(items, { min: 10, sort: 'high' });
+  const page = catalogPage(filtered, 2, 12);
+  assert.equal(page.totalPages, 2);
+  assert.equal(page.items[0].price_cents, 1800);
+  assert.equal(page.items.at(-1).price_cents, 1000);
+  assert.equal(catalogPage(filtered, 100, 12).page, 2);
+  assert.deepEqual(catalogPage([], 5).items, []);
+  assert.equal(catalogPage([], 5).page, 1);
+});
+
+test('home selection is bounded, diverse and leaves the shared cart catalog intact', () => {
+  const items = Array.from({ length: 24 }, (_, i) => ({
+    ...products[0],
+    id: String(i),
+    category: i < 20 ? 'ألعاب' : 'بطاقات',
+  }));
+  const original = [...items];
+  const selected = featuredProducts(items, 8, { gatewayReady: true });
+  assert.equal(selected.length, 8);
+  assert.equal(new Set(selected.map((p) => p.id)).size, 8);
+  assert.equal(new Set(selected.map((p) => p.category)).size, 2);
+  assert.deepEqual(items, original);
+  assert.equal(items.length, 24);
 });

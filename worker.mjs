@@ -1,5 +1,7 @@
 import { createOperations } from './lib/operations.mjs';
 import { publicDiscovery } from './lib/public-discovery.mjs';
+import { createCollections } from './lib/collections.mjs';
+import { createHomepage } from './lib/homepage.mjs';
 import { createFoxreload } from './lib/foxreload.mjs';
 import { createStoreHandler } from './lib/store-api.mjs';
 import { authService } from './lib/auth.mjs';
@@ -12,6 +14,10 @@ export default {
         auth = authService(env.DB, env);
       const discovery = await publicDiscovery(req, env.DB);
       if (discovery) return discovery;
+      const collections = await createCollections(env.DB, auth.identity)(req);
+      if (collections) return auth.finish(collections);
+      const homepage = await createHomepage(env.DB, auth.identity)(req);
+      if (homepage) return auth.finish(homepage);
       const operations = createOperations(env.DB, auth.identity);
       const operationResponse = await operations.handle(req);
       if (operationResponse) return auth.finish(operationResponse);

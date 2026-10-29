@@ -36,3 +36,25 @@ export function filterProducts(products, options = {}, payment = {}) {
   if (options.sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   return list;
 }
+
+export function catalogPage(products, requested = 1, size = 12) {
+  const totalPages = Math.max(1, Math.ceil(products.length / size));
+  const page = Math.min(totalPages, Math.max(1, Math.floor(Number(requested)) || 1));
+  return { items: products.slice((page - 1) * size, page * size), page, totalPages };
+}
+export function featuredProducts(products, limit = 8, payment = {}) {
+  // Take one per category before filling remaining places; prioritize orderable items.
+  const ordered = [
+    ...products.filter((p) => availability(p, payment).available),
+    ...products.filter((p) => !availability(p, payment).available),
+  ];
+  const chosen = [],
+    categories = new Set();
+  for (const p of ordered)
+    if (!categories.has(p.category) && chosen.length < limit) {
+      categories.add(p.category);
+      chosen.push(p);
+    }
+  for (const p of ordered) if (!chosen.includes(p) && chosen.length < limit) chosen.push(p);
+  return chosen;
+}

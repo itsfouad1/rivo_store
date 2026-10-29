@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#090c17" />
+    <meta
+      name="description"
+      content="تصفح منتجات ريفو لشحن الألعاب والبطاقات الرقمية. ابحث وحدد منطقة التفعيل والعملة والسعر المناسب."
+    />
+    <title>تفاصيل المنتج — RIVO | ريفو</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/dashboard.css" />
+    <link rel="stylesheet" href="/catalog.css" />
+    <link rel="stylesheet" href="/product-groups.css" />
+    <link rel="stylesheet" href="/policies.css" />
+    <link rel="icon" href="/assets/logo.png" />
+    <link rel="stylesheet" href="/chat.css" />
+    <link rel="stylesheet" href="/purchase.css" />
+    <link rel="stylesheet" href="/notifications.css" />
+    <link rel="stylesheet" href="/operations.css" />
+  </head>
+  <body class="storefront product-detail-page" data-catalog="product">
+    <header>
+      <div class="wrap topbar">
+        <a href="/" aria-label="ريفو — الرئيسية"
+          ><img class="logo" src="/assets/logo.png" alt="RIVO ريفو" width="128" height="52"
+        /></a>
+        <nav aria-label="القائمة الرئيسية">
+          <a href="/products.html" aria-current="page">المنتجات</a><a href="/#how">كيف تطلب؟</a
+          ><a href="/#faq">الأسئلة الشائعة</a>
+        </nav>
+        <a href="/login" class="store-login" id="account-link">دخول / حسابي</a
+        ><button class="cart-toggle" id="cart-open" aria-label="فتح السلة">
+          <svg viewBox="0 0 24 24"><path d="M3 3h2l3 12h10l3-9H6M9 20h.01M18 20h.01" /></svg
+          ><span class="cart-word">السلة</span><b id="count">0</b>
+        </button>
+      </div>
+    </header>
+    <main>
+      <div class="wrap detail-market">
+        <label class="market-select"
+          >الدولة وعملة العرض<select id="market" aria-label="اختر الدولة وعملة العرض"></select
+        ></label>
+      </div>
+      <div class="wrap product-page" id="product-page">
+        <div class="catalog-loading" role="status">جاري تحميل الفئات…</div>
+      </div>
+    </main>
+    <footer>
+      <div class="wrap footer-main">
+        <div>
+          <img src="/assets/logo.png" alt="ريفو" width="120" height="48" />
+          <p>عالمك الرقمي، على كيفك.</p>
+        </div>
+        <div class="footer-links">
+          <a href="/products.html">المنتجات</a><a href="/#how">طريقة الطلب</a
+          ><a href="/#faq">الأسئلة الشائعة</a>
+        </div>
+        <div id="store-policy-links" class="policy-links"></div>
+        <span>شحن ألعاب وبطاقات رقمية<br /><small>تفاصيل الطلب والتوفّر حسب كل منتج</small></span>
+      </div>
+      <div class="wrap copyright">
+        © <span id="year"></span> RIVO | ريفو · أسعار العملات بواسطة
+        <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer"
+          >ExchangeRate-API</a
+        >
+      </div>
+    </footer>
+    <dialog id="product-dialog" class="product-dialog">
+      <button class="close" data-close="product-dialog" aria-label="إغلاق تفاصيل المنتج">×</button>
+      <div id="product-content"></div>
+    </dialog>
+    <dialog id="cart-dialog" class="cart-dialog">
+      <div class="dialog-head">
+        <h2>سلتك <span id="cart-title-count"></span></h2>
+        <button class="close" data-close="cart-dialog" aria-label="إغلاق السلة">×</button>
+      </div>
+      <div class="cart-notice">راجع المنطقة وطريقة الطلب. لا يتم تأكيد الدفع بمجرد التواصل.</div>
+      <div id="cart-items"></div>
+      <div class="cart-summary">
+        <div><span>الإجمالي</span><strong id="total" dir="ltr">$0.00</strong></div>
+        <button class="primary" id="checkout-button">متابعة الطلب</button
+        ><button class="secondary" data-close="cart-dialog">أكمل التصفح</button>
+      </div>
+    </dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/app.js"></script>
+    <script src="/chat.js"></script>
+    <script src="/notifications.js"></script>
+  </body>
+</html>

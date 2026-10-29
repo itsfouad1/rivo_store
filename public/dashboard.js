@@ -121,6 +121,8 @@ async function refresh() {
 let nav = [
   ['overview', '⌘', 'نظرة عامة'],
   ['products', '▦', 'المنتجات'],
+  ['collections', '◈', 'تنظيم المنتجات'],
+  ['homepage', '⌂', 'تصميم الرئيسية'],
   ['orders', '▤', 'الطلبات'],
   ['operations', '◎', 'متابعة الطلبات'],
   ['reports', '◷', 'تقارير الربح'],
@@ -145,6 +147,8 @@ function renderAdmin() {
           producthealth: 'products',
           launch: 'settings',
           products: 'products',
+          collections: 'products',
+          homepage: 'settings',
           orders: 'orders_write',
           suppliers: 'suppliers',
           foxreload: 'suppliers',
@@ -163,6 +167,9 @@ function renderAdmin() {
     operations: () => RivoOperations.render('operations'),
     reports: () => RivoOperations.render('reports'),
     producthealth: () => RivoOperations.render('producthealth'),
+    collections: () => RivoCollections.render(),
+    homepage: () =>
+      import('/homepage-admin.js').then((m) => m.renderHomepage()).catch((e) => toast(e.message)),
     launch: () => RivoOperations.render('launch'),
     overview: overview,
     products: productsView,

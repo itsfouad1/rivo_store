@@ -26,6 +26,11 @@ body {
   padding: 24px 18px;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.sidebar > * {
+  flex-shrink: 0;
 }
 .sidebar .brand {
   padding: 0 12px 26px;
@@ -807,6 +812,7 @@ td {
     position: relative;
     padding: 12px 15px;
     display: block;
+    overflow: visible;
   }
   .sidebar .brand {
     padding: 0 0 12px;
@@ -1096,15 +1102,4 @@ td {
   height: 1px;
   background: #e9e8f0;
   flex: 1;
-}
-
-@media (min-width: 651px) {
-  .sidebar {
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-  }
-
-  .sidebar > * {
-    flex-shrink: 0;
-  }
 }
