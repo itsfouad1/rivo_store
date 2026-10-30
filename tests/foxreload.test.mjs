@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { createFoxreload, units, sellingPrice, verifyWebhook } from '../lib/foxreload.mjs';
-import { createStoreHandler } from '../lib/store-api.mjs';
+import { createFoxreload, units, sellingPrice, verifyWebhook } from '../src/lib/foxreload.mjs';
+import { createStoreHandler } from '../src/lib/store-api.mjs';
 function setup({ live = true, paymentTimeout = false, createTimeout = false } = {}) {
   const sql = new DatabaseSync(':memory:');
   for (const f of [

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { convertCents, refreshRates, ensureRates } from '../lib/exchange.mjs';
+import { convertCents, refreshRates, ensureRates } from '../src/lib/exchange.mjs';
 
 function database() {
   const sql = new DatabaseSync(':memory:');

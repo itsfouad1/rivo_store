@@ -1,0 +1,102 @@
+async function teamView() {
+  $('dash-view').innerHTML =
+    '<section class="panel"><h2>إدارة الفريق</h2><form id="team-search"><input name="q" placeholder="ابحث بالإيميل أو معرّف الحساب" maxlength="150"><button class="primary">بحث</button></form><div id="team-results"></div></section>';
+  async function load(q = '') {
+    try {
+      const r = await api('/api/admin/team?q=' + encodeURIComponent(q));
+      $('team-results').innerHTML = r.users
+        .map(
+          (u) =>
+            `<div class="order-card"><b>${esc(u.name)}</b><p>${esc(u.email)}</p><p><bdi>${esc(u.id)}</bdi> · ${esc(u.role)} ${u.active ? '' : '· وصول الموظف معطّل'}</p>${u.role === 'owner' ? '' : `<button class="secondary" data-team="${esc(u.id)}">تعديل الصلاحيات</button>`}</div>`,
+        )
+        .join('');
+      $('team-results')
+        .querySelectorAll('[data-team]')
+        .forEach(
+          (b) =>
+            (b.onclick = () => {
+              const u = r.users.find((u) => u.id === b.dataset.team),
+                perms = u.permissions ? JSON.parse(u.permissions) : r.permissions;
+              openEditor(
+                `${editorHead('صلاحيات ' + u.name)}<p>${esc(u.email)}</p><form id="team-form">${select(
+                  'الدور',
+                  'role',
+                  u.role,
+                  [
+                    ['customer', 'زبون'],
+                    ['support', 'دعم فني'],
+                    ['admin', 'أدمن'],
+                  ],
+                )}<p>الأدمن فقط يستخدم الصلاحيات التالية. الدعم يملك بحث الطلبات وملاحظات الدعم فقط.</p>${r.permissions.map((p) => `<label class="check-field"><input type="checkbox" name="permissions" value="${p}" ${perms.includes(p) ? 'checked' : ''}>${{ products: 'المنتجات', orders_write: 'إدارة الطلبات وتأكيد الدفع اليدوي', settings: 'إعدادات المتجر', suppliers: 'الموردون وتنفيذ الطلبات', policies: 'نشر السياسات', reports: 'تقارير الإيرادات والتكاليف المسجلة' }[p]}</label>`).join('')}<label><input name="active" type="checkbox" ${u.active ? 'checked' : ''}>تفعيل وصول الموظف</label>${formEnd('حفظ الصلاحيات')}</form>`,
+              );
+              bindForm('team-form', async (fd) => {
+                await send('/api/admin/team/' + encodeURIComponent(u.id), 'PUT', {
+                  role: fd.get('role'),
+                  permissions: fd.getAll('permissions'),
+                  active: fd.has('active'),
+                });
+                closeEditor();
+                await load(q);
+                toast('تم تحديث الصلاحيات');
+              });
+            }),
+        );
+    } catch (e) {
+      $('team-results').textContent = e.message;
+    }
+  }
+  $('team-search').onsubmit = (e) => {
+    e.preventDefault();
+    load(new FormData(e.target).get('q'));
+  };
+  await load();
+}
+async function supportView() {
+  $('app').innerHTML =
+    `<header class="customer-header"><div class="wrap topbar">${brand}<a href="/account">حسابي</a><a href="/login" data-logout>خروج</a></div></header><main class="customer-wrap"><section class="panel"><h1>مكتب الدعم</h1><p><a class="secondary" href="/operations.html">متابعة الطلبات والتصعيد للإدارة ←</a></p><p><a class="primary" href="/chat.html">المحادثات وقائمة الانتظار ←</a></p><p>ابحث برقم الطلب أو رابط الطلب أو اسم الزبون أو إيميله أو اللاعب أو المنتج.</p><form id="support-search"><input name="q" maxlength="200" placeholder="بيانات الطلب أو الزبون"><button class="primary">بحث</button></form><p id="support-error" role="alert"></p><div id="support-results"></div><button id="support-next" class="secondary" hidden>المزيد</button></section></main>`;
+  let q = '',
+    page = 1;
+  async function load(append = false) {
+    try {
+      const r = await api('/api/support/orders?' + new URLSearchParams({ q, page }));
+      if (!append) $('support-results').replaceChildren();
+      for (const o of r.orders) {
+        const row = document.createElement('div');
+        row.className = 'order-card';
+        row.innerHTML = `<b>#${o.id.slice(0, 8)}</b><p>${esc(o.customer_name)} · ${esc(o.customer_email)}</p><p>${o.items.map((i) => esc(i.name)).join('، ')}</p>${badge(o.status)} ${badge(o.payment_status)} <button class="secondary">عرض الطلب</button>`;
+        row.querySelector('button').onclick = () => open(o.id);
+        $('support-results').append(row);
+      }
+      $('support-next').hidden = page >= r.pages;
+      $('support-error').textContent = r.total + ' طلب مطابق';
+    } catch (e) {
+      $('support-error').textContent = e.message;
+    }
+  }
+  async function open(id) {
+    try {
+      const { order: o, notes } = await api('/api/support/orders/' + id);
+      openEditor(
+        `${editorHead('متابعة الطلب')}<p><bdi>${esc(o.id)}</bdi></p><p>${esc(o.customer_name)} · ${esc(o.customer_email)}</p><p>اللاعب: ${esc(o.player_id)}</p>${badge(o.payment_status)} ${badge(o.status)}<p>${o.items.map((i) => esc(i.name) + ' × ' + i.quantity + (i.player_id ? ' — الحساب: <bdi>' + esc(i.player_id) + '</bdi>' + (i.input_source === 'legacy' ? ' (قديم مشترك)' : '') : '')).join('<br>')}</p><p>${esc(o.customer_update)}</p><p>ملاحظة الزبون: ${esc(o.customer_note)}</p><h3>ملاحظات الدعم الداخلية</h3>${notes.map((n) => '<p>' + esc(n.author) + ' — ' + esc(n.body) + '</p>').join('')}<form id="support-note"><label class="field">ملاحظة داخلية<textarea name="note" maxlength="2000" required></textarea></label>${formEnd('إضافة ملاحظة')}</form>`,
+      );
+      bindForm('support-note', async (fd) => {
+        await send('/api/support/orders/' + id, 'POST', { note: fd.get('note') });
+        await open(id);
+        toast('تم حفظ الملاحظة الداخلية');
+      });
+    } catch (e) {
+      toast(e.message);
+    }
+  }
+  $('support-search').onsubmit = (e) => {
+    e.preventDefault();
+    q = new FormData(e.target).get('q');
+    page = 1;
+    load();
+  };
+  $('support-next').onclick = () => {
+    page++;
+    load(true);
+  };
+  load();
+}

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
-import worker from '../worker.mjs';
+import worker from '../src/worker.mjs';
 
 // Exercises actual Worker routing, Auth cookies, current D1 roles, assistant and chat.
 // Only Supabase's external identity responses are mocked; no live accounts are used.

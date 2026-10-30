@@ -7,7 +7,10 @@
     "deploy": "wrangler deploy",
     "test": "node --experimental-sqlite --test tests/*.test.mjs",
     "db:local": "wrangler d1 migrations apply DB --local",
-    "db:remote": "wrangler d1 migrations apply DB --remote"
+    "db:remote": "wrangler d1 migrations apply DB --remote",
+    "check": "node scripts/check-project.mjs",
+    "build": "wrangler deploy --dry-run --outdir .build",
+    "backup": "node scripts/backup-store.mjs"
   },
   "devDependencies": {
     "wrangler": "4.92.0"

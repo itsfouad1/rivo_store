@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { createStoreHandler } from '../lib/store-api.mjs';
-import { createAssistantAI } from '../lib/assistant-ai.mjs';
+import { createStoreHandler } from '../src/lib/store-api.mjs';
+import { createAssistantAI } from '../src/lib/assistant-ai.mjs';
 function setup(mode = 'test', options = {}) {
   const sql = new DatabaseSync(':memory:');
   for (const f of [

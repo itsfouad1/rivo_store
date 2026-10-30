@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { createFoxreload } from '../lib/foxreload.mjs';
+import { createFoxreload } from '../src/lib/foxreload.mjs';
 function fixture() {
   const sql = new DatabaseSync(':memory:');
   for (const f of readdirSync(new URL('../migrations/', import.meta.url))
@@ -135,7 +135,7 @@ test('HTTP 422 is described as rejected parameters, without exposing provider de
   assert.ok(!r.data.error.includes('fixture-key'));
 });
 test('numbered cursor navigation preserves known back pages and prunes a changed forward branch', () => {
-  const code = readFileSync(new URL('../public/foxreload.js', import.meta.url), 'utf8');
+  const code = readFileSync(new URL('../public/js/foxreload.js', import.meta.url), 'utf8');
   const { make, remember } = runInNewContext(code + '\n({make:foxNewPager,remember:foxRemember})');
   const pager = make();
   remember(pager, 1, 'next-A');

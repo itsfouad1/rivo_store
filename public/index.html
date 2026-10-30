@@ -15,17 +15,19 @@
       href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/style.css" />
-    <link rel="stylesheet" href="/dashboard.css" />
-    <link rel="stylesheet" href="/customer-growth.css" />
-    <link rel="stylesheet" href="/catalog.css" />
-    <link rel="stylesheet" href="/product-groups.css" />
-    <link rel="stylesheet" href="/homepage.css" />
-    <link rel="stylesheet" href="/policies.css" />
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/dashboard.css" />
+    <link rel="stylesheet" href="/css/customer-growth.css" />
+    <link rel="stylesheet" href="/css/catalog.css" />
+    <link rel="stylesheet" href="/css/product-groups.css" />
+    <link rel="stylesheet" href="/css/homepage.css" />
+    <link rel="stylesheet" href="/css/policies.css" />
     <link rel="icon" href="/assets/logo.png" />
-    <link rel="stylesheet" href="/chat.css" />
-    <link rel="stylesheet" href="/purchase.css" />
-  <link rel="stylesheet" href="/notifications.css"><link rel="stylesheet" href="/operations.css"></head>
+    <link rel="stylesheet" href="/css/chat.css" />
+    <link rel="stylesheet" href="/css/purchase.css" />
+    <link rel="stylesheet" href="/css/notifications.css" />
+    <link rel="stylesheet" href="/css/operations.css" />
+  </head>
   <body class="storefront">
     <header>
       <div class="wrap topbar">
@@ -94,13 +96,31 @@
         </div>
         <section id="catalog" class="catalog home-featured">
           <div class="section-heading">
-            <div><span class="kicker">ابدأ جولتك</span><h2>اختيارات من عالم ريفو</h2><p class="featured-intro">شحن وبطاقات رقمية، اختار اللي بناسبك.</p></div>
+            <div>
+              <span class="kicker">ابدأ جولتك</span>
+              <h2>اختيارات من عالم ريفو</h2>
+              <p class="featured-intro">شحن وبطاقات رقمية، اختار اللي بناسبك.</p>
+            </div>
             <a class="browse-all" href="/products.html">كل المنتجات <span>←</span></a>
           </div>
-          <div class="featured-tools"><label class="market-select">الدولة وعملة العرض <select id="market" aria-label="اختر الدولة وعملة العرض"></select></label></div>
-          <div id="grid" class="grid" aria-busy="true"><p class="catalog-loading">عم نجهّز المنتجات…</p></div>
-          <div id="empty" class="empty" hidden><h3>منتجات ريفو قريبًا</h3><p>عم نجهّز الكتالوج.</p><a class="secondary" href="/products.html">تصفح المنتجات</a></div>
-          <div class="featured-bottom"><p id="results" role="status" aria-live="polite"></p><a class="primary" href="/products.html">اكتشف كل المنتجات <span>←</span></a></div>
+          <div class="featured-tools">
+            <label class="market-select"
+              >الدولة وعملة العرض
+              <select id="market" aria-label="اختر الدولة وعملة العرض"></select
+            ></label>
+          </div>
+          <div id="grid" class="grid" aria-busy="true">
+            <p class="catalog-loading">عم نجهّز المنتجات…</p>
+          </div>
+          <div id="empty" class="empty" hidden>
+            <h3>منتجات ريفو قريبًا</h3>
+            <p>عم نجهّز الكتالوج.</p>
+            <a class="secondary" href="/products.html">تصفح المنتجات</a>
+          </div>
+          <div class="featured-bottom">
+            <p id="results" role="status" aria-live="polite"></p>
+            <a class="primary" href="/products.html">اكتشف كل المنتجات <span>←</span></a>
+          </div>
         </section>
         <section id="how" class="how">
           <div class="section-heading">
@@ -206,7 +226,8 @@
       </div>
     </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="/app.js"></script>
-    <script src="/chat.js"></script>
-  <script src="/notifications.js"></script></body>
+    <script type="module" src="/js/app.js"></script>
+    <script src="/js/chat.js"></script>
+    <script src="/js/notifications.js"></script>
+  </body>
 </html>

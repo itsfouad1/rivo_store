@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
-import { createStoreHandler } from '../lib/store-api.mjs';
-import { createFoxreload } from '../lib/foxreload.mjs';
-import { steamLogin, steamCost } from '../lib/steam.mjs';
+import { createStoreHandler } from '../src/lib/store-api.mjs';
+import { createFoxreload } from '../src/lib/foxreload.mjs';
+import { steamLogin, steamCost } from '../src/lib/steam.mjs';
 function setup() {
   const sql = new DatabaseSync(':memory:');
   sql.exec('PRAGMA foreign_keys=ON');

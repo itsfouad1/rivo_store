@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { createPayunit, verifyPayunitWebhook } from '../lib/payunit.mjs';
-import { createStoreHandler } from '../lib/store-api.mjs';
-import { createFoxreload } from '../lib/foxreload.mjs';
+import { createPayunit, verifyPayunitWebhook } from '../src/lib/payunit.mjs';
+import { createStoreHandler } from '../src/lib/store-api.mjs';
+import { createFoxreload } from '../src/lib/foxreload.mjs';
 
 function setup(mode = 'live') {
   const sql = new DatabaseSync(':memory:');

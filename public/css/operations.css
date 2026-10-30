@@ -1,0 +1,107 @@
+.ops-panel h2 {
+  font-size: 22px;
+}
+.ops-filters {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+  background: #f8f5fc;
+  padding: 16px;
+  border-radius: 12px;
+  margin: 16px 0;
+}
+.ops-filters .field {
+  flex: 1 1 180px;
+  margin: 0;
+}
+.ops-filters h3,
+.ops-filters .form-actions,
+.ops-filters .form-error {
+  flex-basis: 100%;
+}
+.ops-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ops-issues {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 14px;
+}
+.ops-issues .order-card {
+  margin: 0;
+}
+.ops-tag {
+  display: inline-block;
+  background: #eee6fc;
+  color: #7343af;
+  font-size: 11px;
+  border-radius: 6px;
+  padding: 5px 8px;
+  margin: 3px;
+}
+.ops-actions,
+.ops-pages {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.ops-pages {
+  justify-content: space-between;
+}
+.ops-panel code {
+  overflow-wrap: anywhere;
+}
+.ops-panel table {
+  min-width: 760px;
+}
+.ops-panel .stats {
+  margin: 20px 0;
+}
+.ops-panel .stats .stat {
+  min-width: 0;
+}
+.ops-panel button {
+  min-height: 40px;
+}
+.ops-panel .warning-box {
+  line-height: 1.9;
+}
+.ops-standalone {
+  max-width: 1150px;
+  margin: 30px auto;
+  padding: 0 18px;
+}
+.ops-standalone header {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.ops-panel .helper {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 650px) {
+  .ops-filters .field {
+    flex-basis: 100%;
+  }
+  .ops-issues {
+    grid-template-columns: 1fr;
+  }
+  .ops-panel .page-head {
+    flex-wrap: wrap;
+  }
+  .ops-panel .stats {
+    grid-template-columns: 1fr;
+  }
+}
+#ops-bulk [hidden] {
+  display: none !important;
+}

@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { staffIdentity, canManage } from '../lib/staff.mjs';
-import { createStoreHandler } from '../lib/store-api.mjs';
+import { staffIdentity, canManage } from '../src/lib/staff.mjs';
+import { createStoreHandler } from '../src/lib/store-api.mjs';
 const owner = 'supabase:9fe15a87-5c6a-4575-839d-5bf4905aef6e';
 function setup() {
   const sql = new DatabaseSync(':memory:');

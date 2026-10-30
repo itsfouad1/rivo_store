@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reviewCart, regionNotice } from '../public/purchase-ui.js';
-import { orderProgress } from '../public/order-progress.js';
+import { reviewCart, regionNotice } from '../public/js/purchase-ui.js';
+import { orderProgress } from '../public/js/order-progress.js';
 const p = {
   id: 'card',
   name: 'Steam',

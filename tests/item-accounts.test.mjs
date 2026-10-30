@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { createStoreHandler } from '../lib/store-api.mjs';
-import { createFoxreload } from '../lib/foxreload.mjs';
+import { createStoreHandler } from '../src/lib/store-api.mjs';
+import { createFoxreload } from '../src/lib/foxreload.mjs';
 function setup() {
   const sql = new DatabaseSync(':memory:');
   sql.exec('PRAGMA foreign_keys=ON');
@@ -228,7 +228,7 @@ test('FoxReload per-line data matches the right item and never grants execution 
   assert.equal(x.sql.prepare('SELECT count(*) AS n FROM fox_jobs').get().n, 0);
 });
 test('supplier suggestion fills only an unambiguous identifier field and leaves legacy/multi-field input for review', () => {
-  const code = readFileSync(new URL('../public/foxreload.js', import.meta.url), 'utf8');
+  const code = readFileSync(new URL('../public/js/foxreload.js', import.meta.url), 'utf8');
   const suggest = runInNewContext(code + '\nfoxSavedNote');
   const item = { input_source: 'item', player_id: 'alpha_42' };
   const schema = { required: ['login'], types: { login: 'string' }, options: {} };

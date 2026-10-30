@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { authService } from '../lib/auth.mjs';
-import worker from '../worker.mjs';
+import { authService } from '../src/lib/auth.mjs';
+import worker from '../src/worker.mjs';
 const env = {
   SUPABASE_URL: 'https://test-project.supabase.co',
   SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test',

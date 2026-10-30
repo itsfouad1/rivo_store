@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { createStoreHandler } from '../lib/store-api.mjs';
-import { staffIdentity } from '../lib/staff.mjs';
+import { createStoreHandler } from '../src/lib/store-api.mjs';
+import { staffIdentity } from '../src/lib/staff.mjs';
 function setup() {
   const sql = new DatabaseSync(':memory:');
   for (const f of [

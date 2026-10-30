@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { createStoreHandler } from '../lib/store-api.mjs';
+import { createStoreHandler } from '../src/lib/store-api.mjs';
 function fixture() {
   const sql = new DatabaseSync(':memory:');
   for (const f of [
