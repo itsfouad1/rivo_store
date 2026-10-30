@@ -1,3 +1,4 @@
+import {mountOrderExtras} from './customer-growth-ui.js';
 import { progressHTML } from './order-progress.js';
 const $ = (id) => document.getElementById(id);
 const esc = (v) =>
@@ -104,6 +105,7 @@ function render({ order: o, support_url }) {
         'تعذّر فتح الشات الآن. جرّب بعد لحظة أو استخدم واتساب إن كان متاحًا.';
   };
   help.append(chat);
+  mountOrderExtras($('details'),o);
   return !test && o.payment_status === 'paid';
 }
 async function copy(value) {

@@ -12,9 +12,10 @@ const $ = (id) => document.getElementById(id),
 const supportedCurrencies = ['ILS', 'JOD', 'EGP', 'SAR', 'AED', 'USD', 'TRY'];
 const fullCatalog = document.body.dataset.catalog === 'full';
 const productPage = document.body.dataset.catalog === 'product';
-let definitions = [],
-  productType = '';
+let definitions = [], productType = '';
 let homeContent = homeDefaults();
+const favoritesOnly = fullCatalog && new URLSearchParams(location.search).get('favorites') === '1';
+let favoriteIds = [];
 const groups = () => groupProducts(products, definitions, paymentOptions());
 let currentPage = 1;
 let gatewayReady = false,
@@ -120,29 +121,20 @@ const purchase = createPurchaseUI({
   },
 });
 function addToCart(id, quantity) {
-  const p = products.find((p) => p.id === id);
-  if (!p || !productState(p).available) throw Error('المنتج غير متاح.');
-  if (!Number.isInteger(quantity) || quantity < (p.min_quantity ?? 1))
-    throw Error('راجع كمية المنتج');
-  const row = cart.find((x) => x.id === id),
-    total = (row?.quantity || 0) + quantity;
-  if (total > Math.min(99, p.max_quantity ?? 99))
-    throw Error('الكمية الإجمالية تتجاوز الحد المتاح.');
-  if (row) row.quantity = total;
-  else cart.push({ id, quantity });
-  pendingToken = null;
-  renderCart();
-  toast('تمت الإضافة للسلة');
-}
-const productDetail = productPage
-  ? createProductPage({
-      getState: () => ({ products, definitions, config, gatewayReady }),
-      art,
-      money,
-      add: addToCart,
-      toast,
-    })
-  : null;
+    const p = products.find((p) => p.id === id);
+    if (!p || !productState(p).available) throw Error('المنتج غير متاح.');
+    if (!Number.isInteger(quantity) || quantity < (p.min_quantity ?? 1)) throw Error('راجع كمية المنتج');
+    const row = cart.find((x) => x.id === id),
+      total = (row?.quantity || 0) + quantity;
+    if (total > Math.min(99, p.max_quantity ?? 99))
+      throw Error('الكمية الإجمالية تتجاوز الحد المتاح.');
+    if (row) row.quantity = total;
+    else cart.push({ id, quantity });
+    pendingToken = null;
+    renderCart();
+    toast('تمت الإضافة للسلة');
+  }
+const productDetail = productPage ? createProductPage({getState: () => ({products, definitions, config, gatewayReady}), art, money, add: addToCart, toast}) : null;
 try {
   const old = JSON.parse(localStorage.getItem('rivo-cart-v3') || '[]');
   if (Array.isArray(old))
@@ -190,55 +182,44 @@ function filters() {
     .join('');
 }
 function render() {
-  if (productPage) {
-    productDetail.render();
-    return;
-  }
+  if (productPage) { productDetail.render(); return; }
   const min = $('price-min')?.value ?? '',
     max = $('price-max')?.value ?? '';
   const invalid =
     (min !== '' && Number(min) < 0) ||
     (max !== '' && Number(max) < 0) ||
     (min !== '' && max !== '' && Number(min) > Number(max));
-  if ($('filter-error'))
-    $('filter-error').textContent = invalid
-      ? 'أدخل حدود سعر صحيحة: من يجب أن يكون أقل من أو يساوي إلى.'
-      : '';
+  if ($('filter-error')) $('filter-error').textContent = invalid
+    ? 'أدخل حدود سعر صحيحة: من يجب أن يكون أقل من أو يساوي إلى.'
+    : '';
   const list = invalid
     ? []
     : filterProducts(
-        products,
+        favoritesOnly ? products.filter(p=>favoriteIds.includes(p.id)) : products,
         { category, term, sort, region, onlyAvailable, min, max },
         paymentOptions(),
       );
-  let grouped = groupProducts(list, definitions, paymentOptions()).filter(
-    (g) => !productType || g.kind === productType,
-  );
-  if (sort === 'low') grouped.sort((a, b) => a.price_cents - b.price_cents);
-  if (sort === 'high') grouped.sort((a, b) => b.price_cents - a.price_cents);
-  if (sort === 'name') grouped.sort((a, b) => a.title.localeCompare(b.title, 'ar'));
-  if (!fullCatalog) grouped.sort((a, b) => Number(b.available) - Number(a.available));
-  const selection = fullCatalog
-    ? catalogPage(grouped, currentPage, 12)
-    : { items: selectHomeGroups(grouped, homeContent.featured), page: 1, totalPages: 1 };
+  let grouped = groupProducts(list, definitions, paymentOptions()).filter(g=>!productType||g.kind===productType);
+  if (sort === 'low') grouped.sort((a,b)=>a.price_cents-b.price_cents);
+  if (sort === 'high') grouped.sort((a,b)=>b.price_cents-a.price_cents);
+  if (sort === 'name') grouped.sort((a,b)=>a.title.localeCompare(b.title,'ar'));
+  if (!fullCatalog) grouped.sort((a,b)=>Number(b.available)-Number(a.available));
+  const selection = fullCatalog ? catalogPage(grouped, currentPage, 12) : { items: selectHomeGroups(grouped, homeContent.featured), page: 1, totalPages: 1 };
   currentPage = selection.page;
   const visible = selection.items;
   $('grid').setAttribute('aria-busy', 'false');
-  $('grid').innerHTML = visible
-    .map((g) => {
-      const p = { ...g.representative, name: g.title };
-      return `<article class="product ${g.available ? '' : 'is-unavailable'}"><a class="group-cover" href="${esc(groupUrl(g) + (region ? '&region=' + encodeURIComponent(region) : ''))}" aria-label="تصفح فئات ${esc(g.title)}">${art(p)}</a><div class="product-body"><span class="stock-label ${g.available ? '' : 'unavailable'}">${g.available ? 'فئات متاحة للطلب' : 'غير متاح للطلب حاليًا'}</span><a class="product-title" href="${esc(groupUrl(g) + (region ? '&region=' + encodeURIComponent(region) : ''))}">${esc(g.title)}</a><p class="product-sub">${esc(kindLabels[g.kind])} · ${g.variants.length} فئة${g.regions.length ? ' · ' + g.regions.length + ' منطقة' : ''}</p><div class="product-bottom"><div class="product-price"><small>يبدأ من</small><strong>${esc(money(g.price_cents, g.currency))}</strong></div><a class="details-btn" href="${esc(groupUrl(g) + (region ? '&region=' + encodeURIComponent(region) : ''))}">اختار الفئة ←</a></div></div></article>`;
-    })
-    .join('');
+  $('grid').innerHTML = visible.map(g => {
+    const p = {...g.representative, name:g.title};
+    return `<article class="product ${g.available?'':'is-unavailable'}"><a class="group-cover" href="${esc(groupUrl(g)+(region?'&region='+encodeURIComponent(region):''))}" aria-label="تصفح فئات ${esc(g.title)}">${art(p)}</a><div class="product-body"><span class="stock-label ${g.available?'':'unavailable'}">${g.available?'فئات متاحة للطلب':'غير متاح للطلب حاليًا'}</span><a class="product-title" href="${esc(groupUrl(g)+(region?'&region='+encodeURIComponent(region):''))}">${esc(g.title)}</a><p class="product-sub">${esc(kindLabels[g.kind])} · ${g.variants.length} فئة${g.regions.length?' · '+g.regions.length+' منطقة':''}</p><div class="product-bottom"><div class="product-price"><small>يبدأ من</small><strong>${esc(money(g.price_cents,g.currency))}</strong></div><a class="details-btn" href="${esc(groupUrl(g)+(region?'&region='+encodeURIComponent(region):''))}">اختار الفئة ←</a></div></div></article>`;
+  }).join('');
   $('empty').hidden = grouped.length > 0;
   $('results').textContent = fullCatalog
-    ? grouped.length
-      ? `عرض ${(currentPage - 1) * 12 + 1}–${(currentPage - 1) * 12 + visible.length} من ${grouped.length} مجموعة`
-      : 'لا توجد نتائج'
+    ? (grouped.length ? `عرض ${(currentPage - 1) * 12 + 1}–${(currentPage - 1) * 12 + visible.length} من ${grouped.length} مجموعة` : 'لا توجد نتائج')
     : `عرض ${visible.length} من ${grouped.length} مجموعة`;
   renderPages(selection.totalPages);
   $('empty').querySelector('h3').textContent = 'ما لقينا منتجات';
   $('empty').querySelector('p').textContent = 'جرّب تخفيف الفلاتر أو البحث باسم آخر.';
+  if(favoritesOnly&&!grouped.length)$('empty').querySelector('p').textContent='لا توجد فئات في مفضلتك تطابق هذه الفلاتر. أضف فئات من صفحات المنتجات أولًا.';
   if (!products.length) {
     $('empty').querySelector('h3').textContent = 'منتجات ريفو قريبًا';
     $('empty').querySelector('p').textContent = 'عم نجهّز الكتالوج. تابعنا لتعرف الجديد.';
@@ -257,43 +238,22 @@ function renderPages(total) {
   const target = $('catalog-pages');
   if (!target) return;
   target.hidden = total <= 1;
-  const pages = [...new Set([1, currentPage - 1, currentPage, currentPage + 1, total])]
-    .filter((p) => p > 0 && p <= total)
-    .sort((a, b) => a - b);
+  const pages = [...new Set([1, currentPage - 1, currentPage, currentPage + 1, total])].filter(p => p > 0 && p <= total).sort((a,b) => a-b);
   let previous = 0;
-  target.innerHTML =
-    `<button data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>السابق</button>` +
-    pages
-      .map((p) => {
-        const gap = previous && p - previous > 1 ? '<span aria-hidden="true">…</span>' : '';
-        previous = p;
-        return (
-          gap +
-          `<button data-page="${p}" ${p === currentPage ? 'aria-current="page"' : ''} aria-label="صفحة ${p}">${p}</button>`
-        );
-      })
-      .join('') +
-    `<button data-page="${currentPage + 1}" ${currentPage === total ? 'disabled' : ''}>التالي</button>`;
+  target.innerHTML = `<button data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>السابق</button>` + pages.map(p => {
+    const gap = previous && p - previous > 1 ? '<span aria-hidden="true">…</span>' : '';
+    previous = p;
+    return gap + `<button data-page="${p}" ${p === currentPage ? 'aria-current="page"' : ''} aria-label="صفحة ${p}">${p}</button>`;
+  }).join('') + `<button data-page="${currentPage + 1}" ${currentPage === total ? 'disabled' : ''}>التالي</button>`;
 }
-$('catalog-pages')?.addEventListener('click', (e) => {
+$('catalog-pages')?.addEventListener('click', e => {
   const button = e.target.closest('button[data-page]');
   if (!button || button.disabled) return;
   currentPage = Number(button.dataset.page);
   render();
-  $('catalog').scrollIntoView({ block: 'start' });
+  $('catalog').scrollIntoView({block: 'start'});
 });
-document.querySelectorAll('[data-kind]').forEach(
-  (b) =>
-    (b.onclick = () => {
-      productType = b.dataset.kind;
-      currentPage = 1;
-      document.querySelectorAll('[data-kind]').forEach((x) => {
-        x.classList.toggle('active', x === b);
-        x.setAttribute('aria-pressed', String(x === b));
-      });
-      render();
-    }),
-);
+document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{productType=b.dataset.kind;currentPage=1;document.querySelectorAll('[data-kind]').forEach(x=>{x.classList.toggle('active',x===b);x.setAttribute('aria-pressed',String(x===b))});render()});
 $('filters')?.addEventListener('click', (e) => {
   const b = e.target.closest('[data-category]');
   if (b) {
@@ -343,10 +303,7 @@ function resetFilters() {
   currentPage = 1;
   category = 'الكل';
   productType = '';
-  document.querySelectorAll('[data-kind]').forEach((b) => {
-    b.classList.toggle('active', b.dataset.kind === '');
-    b.setAttribute('aria-pressed', String(b.dataset.kind === ''));
-  });
+  document.querySelectorAll('[data-kind]').forEach(b=>{b.classList.toggle('active',b.dataset.kind==='');b.setAttribute('aria-pressed',String(b.dataset.kind===''))});
   term = '';
   sort = 'default';
   region = '';
@@ -360,6 +317,7 @@ function resetFilters() {
   render();
 }
 $('reset')?.addEventListener('click', resetFilters);
+if(favoritesOnly){document.querySelector('.catalog .section-heading h2').textContent='مفضلتي';$('reset').textContent='تصفح كل المنتجات';$('reset').onclick=()=>location.assign('/products.html');}
 $('clear-filters')?.addEventListener('click', resetFilters);
 $('region')?.addEventListener('change', (e) => {
   region = e.target.value;
@@ -371,17 +329,11 @@ $('available-only')?.addEventListener('change', (e) => {
   currentPage = 1;
   render();
 });
-['price-min', 'price-max'].forEach((id) =>
-  $(id)?.addEventListener('input', () => {
-    currentPage = 1;
-    render();
-  }),
-);
-if ($('grid'))
-  $('grid').onclick = (e) => {
-    const b = e.target.closest('[data-view]');
-    if (b) view(b.dataset.view);
-  };
+['price-min', 'price-max'].forEach((id) => $(id)?.addEventListener('input', () => { currentPage = 1; render(); }));
+if ($('grid')) $('grid').onclick = (e) => {
+  const b = e.target.closest('[data-view]');
+  if (b) view(b.dataset.view);
+};
 function view(id) {
   purchase.view(id);
 }
@@ -484,38 +436,29 @@ async function loadStore() {
 async function boot() {
   try {
     await loadStore();
-    try {
-      definitions = (await api('/api/collections')).groups;
-    } catch {
-      toast('تعذّر تحميل تنظيم المنتجات؛ يظهر التجميع التلقائي مؤقتًا');
-    }
+    try { definitions = (await api('/api/collections')).groups; } catch { toast('تعذّر تحميل تنظيم المنتجات؛ يظهر التجميع التلقائي مؤقتًا'); }
     if (!fullCatalog && !productPage) {
-      try {
-        homeContent = await api('/api/homepage');
-      } catch {
-        toast('تعذّر تحميل تخصيص الرئيسية؛ يظهر التصميم الأساسي مؤقتًا');
-      }
+      try { homeContent = await api('/api/homepage'); } catch { toast('تعذّر تحميل تخصيص الرئيسية؛ يظهر التصميم الأساسي مؤقتًا'); }
       renderHomeContent(homeContent, config);
     }
     await loadPolicies();
-    if ($('hero-title') && !document.querySelector('.home-featured'))
-      $('hero-title').innerHTML =
-        esc(config.heroTitle) + '<br><span>' + esc(config.heroAccent) + '</span>';
-    if ($('hero-description') && !document.querySelector('.home-featured'))
-      $('hero-description').textContent = config.heroDescription;
+    if ($('hero-title') && !document.querySelector('.home-featured')) $('hero-title').innerHTML =
+      esc(config.heroTitle) + '<br><span>' + esc(config.heroAccent) + '</span>';
+    if ($('hero-description') && !document.querySelector('.home-featured')) $('hero-description').textContent = config.heroDescription;
     if ($('tagline')) $('tagline').textContent = config.tagline;
     if ($('announcement')) $('announcement').textContent = config.announcement;
-    document.title = fullCatalog
-      ? 'المنتجات — ' + config.storeName
-      : config.storeName + ' — ' + config.tagline;
+    document.title = fullCatalog ? (favoritesOnly?'مفضلتي — ':'المنتجات — ') + config.storeName : config.storeName + ' — ' + config.tagline;
     filters();
     render();
     renderCart();
     const deepProduct = new URLSearchParams(location.search).get('product');
-    if (!productPage && deepProduct && products.some((p) => p.id === deepProduct))
-      view(deepProduct);
+    if (!productPage && deepProduct && products.some((p) => p.id === deepProduct)) view(deepProduct);
     try {
       user = (await api('/api/session')).user;
+      if(favoritesOnly){if(user){favoriteIds=(await api('/api/customer/favorites')).ids;render();}else{toast('سجّل الدخول لعرض المفضلة');$('empty').hidden=false;$('empty').querySelector('p').innerHTML='<a href="/login">سجّل الدخول لعرض مفضلتك</a>';}}
+      const repeat=new URLSearchParams(location.search).get('reorder');
+      if(repeat&&!user)toast('سجّل الدخول من حسابك ثم افتح إعادة الطلب');
+      if(repeat&&user){const r=await api('/api/customer/reorder/'+encodeURIComponent(repeat));let added=0;for(const row of r.items){const p=products.find(p=>p.id===row.id);if(!p||!productState(p).available)continue;const existing=cart.find(x=>x.id===row.id)?.quantity||0,qty=Math.min(row.quantity,(p.max_quantity??99)-existing,99-existing);if(qty<(p.min_quantity??1)||(p.account_type==='steam'&&existing))continue;addToCart(p.id,p.account_type==='steam'?1:qty);added++;}toast(added?'تمت إضافة '+added+' منتج متاح للسلة؛ راجع الكميات وبيانات الحساب':'منتجات الطلب غير متاحة للطلب الآن');$('cart-dialog').showModal();const clean=new URL(location.href);clean.searchParams.delete('reorder');history.replaceState(null,'',clean);}
       if (user) {
         $('account-link').textContent = ['owner', 'admin', 'support'].includes(user.role)
           ? 'لوحة الإدارة'
@@ -524,16 +467,9 @@ async function boot() {
           ? '/admin'
           : '/account';
       }
-    } catch {}
+    } catch (e) { if(favoritesOnly||new URLSearchParams(location.search).has('reorder'))toast(e.message); }
   } catch (e) {
-    if (productPage) {
-      $('product-page').innerHTML =
-        '<div class=empty><h1>تعذّر تحميل المنتج</h1><p>' +
-        esc(e.message) +
-        '</p><a class=primary href=/products.html>ارجع للمنتجات</a></div>';
-      toast(e.message);
-      return;
-    }
+    if (productPage) { $('product-page').innerHTML = '<div class=empty><h1>تعذّر تحميل المنتج</h1><p>'+esc(e.message)+'</p><a class=primary href=/products.html>ارجع للمنتجات</a></div>'; toast(e.message); return; }
     $('grid').setAttribute('aria-busy', 'false');
     $('grid').innerHTML = '';
     $('empty').hidden = false;

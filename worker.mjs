@@ -1,7 +1,9 @@
-import { createOperations } from './lib/operations.mjs';
-import { publicDiscovery } from './lib/public-discovery.mjs';
-import { createCollections } from './lib/collections.mjs';
-import { createHomepage } from './lib/homepage.mjs';
+import {createOperations} from './lib/operations.mjs';
+import {publicDiscovery} from './lib/public-discovery.mjs';
+import {createCollections} from './lib/collections.mjs';
+import {createHomepage} from './lib/homepage.mjs';
+import {createCustomerGrowth} from './lib/customer-growth.mjs';
+import {createOrderEmail} from './lib/order-email.mjs';
 import { createFoxreload } from './lib/foxreload.mjs';
 import { createStoreHandler } from './lib/store-api.mjs';
 import { authService } from './lib/auth.mjs';
@@ -12,22 +14,17 @@ export default {
     try {
       const url = new URL(req.url),
         auth = authService(env.DB, env);
-      const discovery = await publicDiscovery(req, env.DB);
-      if (discovery) return discovery;
-      const collections = await createCollections(env.DB, auth.identity)(req);
-      if (collections) return auth.finish(collections);
-      const homepage = await createHomepage(env.DB, auth.identity)(req);
-      if (homepage) return auth.finish(homepage);
-      const operations = createOperations(env.DB, auth.identity);
-      const operationResponse = await operations.handle(req);
-      if (operationResponse) return auth.finish(operationResponse);
+      const discovery=await publicDiscovery(req,env.DB);if(discovery)return discovery;
+      const collections=await createCollections(env.DB,auth.identity)(req);if(collections)return auth.finish(collections);
+      const homepage=await createHomepage(env.DB,auth.identity)(req);if(homepage)return auth.finish(homepage);
+      const emailResponse=await createOrderEmail(env,auth.identity).handle(req);if(emailResponse)return auth.finish(emailResponse);
+      if(url.pathname==='/api/coupons/quote'&&req.method==='POST')await ensureRates(env.DB);
+      const growth=await createCustomerGrowth(env.DB,auth.identity)(req);if(growth)return auth.finish(growth);
+      const operations=createOperations(env.DB,auth.identity);const operationResponse=await operations.handle(req);if(operationResponse)return auth.finish(operationResponse);
       const payment = createPayunit(env, auth.identity);
       const paymentResponse = await payment.handle(req);
       if (paymentResponse) return auth.finish(paymentResponse);
-      const supplierResponse = await createFoxreload(
-        { ...env, RIVO_OPERATIONS_ENABLED: true },
-        auth.identity,
-      ).handle(req);
+      const supplierResponse = await createFoxreload({...env,RIVO_OPERATIONS_ENABLED:true}, auth.identity).handle(req);
       if (supplierResponse) return auth.finish(supplierResponse);
       const response = await auth.handle(req);
       if (response) return auth.finish(response);
@@ -45,6 +42,7 @@ export default {
             resolveIdentity: auth.identity,
             foxEnabled: true,
             operationsEnabled: true,
+            commerceEnabled: true,
             gatewayReady: payment.configured(),
             gatewayMode: payunitMode(env),
             ai: env.AI,
@@ -62,23 +60,11 @@ export default {
         headers.set('X-Content-Type-Options', 'nosniff');
         headers.set('Referrer-Policy', 'same-origin');
         headers.set('Content-Security-Policy', "frame-ancestors 'none'");
-        headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+        headers.set('X-Robots-Tag','noindex, nofollow, noarchive');
         return new Response(r.body, { status: r.status, headers });
       }
-      if (
-        [
-          '/dashboard.html',
-          '/order.html',
-          '/payment.html',
-          '/operations.html',
-          '/chat.html',
-        ].includes(url.pathname)
-      ) {
-        const r = await env.ASSETS.fetch(req),
-          headers = new Headers(r.headers);
-        headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
-        headers.set('Cache-Control', 'no-store');
-        return new Response(r.body, { status: r.status, headers });
+      if(['/dashboard.html','/order.html','/payment.html','/operations.html','/chat.html'].includes(url.pathname)){
+        const r=await env.ASSETS.fetch(req),headers=new Headers(r.headers);headers.set('X-Robots-Tag','noindex, nofollow, noarchive');headers.set('Cache-Control','no-store');return new Response(r.body,{status:r.status,headers});
       }
       return env.ASSETS.fetch(req);
     } catch (e) {
@@ -93,8 +79,8 @@ export default {
     if (event.cron === '*/15 * * * *') {
       const results = await Promise.allSettled([
         ensureRates(env.DB),
-        createFoxreload({ ...env, RIVO_OPERATIONS_ENABLED: true }).scheduled(),
-        createOperations(env.DB).reconcile(),
+        createFoxreload({...env,RIVO_OPERATIONS_ENABLED:true}).scheduled(),
+        (async()=>{try{await createOperations(env.DB).reconcile()}finally{await createOrderEmail(env).drain()}})(),
       ]);
       for (const result of results)
         if (result.status === 'rejected')

@@ -123,11 +123,15 @@ let nav = [
   ['products', '▦', 'المنتجات'],
   ['collections', '◈', 'تنظيم المنتجات'],
   ['homepage', '⌂', 'تصميم الرئيسية'],
+  ['content','✎','جودة المحتوى'],
+  ['coupons','％','الكوبونات والتسعير'],
+  ['reviews','★','تقييمات المشتريات'],
+  ['email','✉','إشعارات البريد'],
   ['orders', '▤', 'الطلبات'],
-  ['operations', '◎', 'متابعة الطلبات'],
-  ['reports', '◷', 'تقارير الربح'],
-  ['producthealth', '◇', 'مراجعة المنتجات'],
-  ['launch', '✓', 'تجهيز الإطلاق'],
+  ['operations','◎','متابعة الطلبات'],
+  ['reports','◷','تقارير الربح'],
+  ['producthealth','◇','مراجعة المنتجات'],
+  ['launch','✓','تجهيز الإطلاق'],
   ['suppliers', '⇄', 'الموردون والربط'],
   ['foxreload', '↗', 'FoxReload'],
   ['policies', '≡', 'صفحات وسياسات المتجر'],
@@ -142,13 +146,11 @@ function renderAdmin() {
       !user.permissions ||
       user.permissions.includes(
         {
-          operations: 'orders_write',
-          reports: 'reports',
-          producthealth: 'products',
-          launch: 'settings',
+          operations:'orders_write',reports:'reports',producthealth:'products',launch:'settings',
           products: 'products',
           collections: 'products',
           homepage: 'settings',
+          content:'products',coupons:'settings',reviews:'products',email:'settings',
           orders: 'orders_write',
           suppliers: 'suppliers',
           foxreload: 'suppliers',
@@ -164,13 +166,16 @@ function renderAdmin() {
   $('app').innerHTML =
     `<div class="admin-shell"><aside class="sidebar">${brand}<div class="side-label">إدارة المتجر</div><nav>${nav.map(([key, icon, title]) => `<a class="side-link ${key === current ? 'active' : ''}" href="#${key}"><span class="ico">${icon}</span>${title}</a>`).join('')}</nav><div class="side-bottom"><a class="side-link" href="/">↗ معاينة المتجر</a><a class="side-link" href="/account">◇ حسابي كزبون</a><a class="side-link" href="/login" data-logout target="_top">← تسجيل الخروج</a></div><div class="side-profile"><b>${esc(user.name)}</b>${esc(user.email)} <span class="admin-chip">مدير</span></div></aside><main class="admin-main"><div class="dash-topbar"><div><h1>${nav.find((x) => x[0] === current)[2]}</h1><p>RIVO / لوحة الإدارة</p></div><div class="top-user"><span class="badge purple">حساب الإدارة</span><span class="avatar">${esc(user.name.slice(0, 1))}</span><a class="link-btn" href="/">المتجر ↗</a><a class="link-btn" target="_top" href="/login" data-logout>خروج</a></div></div><div class="dash-content" id="dash-view"></div></main></div>`;
   ({
-    operations: () => RivoOperations.render('operations'),
-    reports: () => RivoOperations.render('reports'),
-    producthealth: () => RivoOperations.render('producthealth'),
-    collections: () => RivoCollections.render(),
-    homepage: () =>
-      import('/homepage-admin.js').then((m) => m.renderHomepage()).catch((e) => toast(e.message)),
-    launch: () => RivoOperations.render('launch'),
+    operations:()=>RivoOperations.render('operations'),
+    reports:()=>RivoOperations.render('reports'),
+    producthealth:()=>RivoOperations.render('producthealth'),
+    collections:()=>RivoCollections.render(),
+    homepage:()=>import('/homepage-admin.js').then(m=>m.renderHomepage()).catch(e=>toast(e.message)),
+    content:()=>import('/growth-admin.js').then(m=>m.renderGrowth('content')).catch(e=>toast(e.message)),
+    coupons:()=>import('/growth-admin.js').then(m=>m.renderGrowth('coupons')).catch(e=>toast(e.message)),
+    reviews:()=>import('/growth-admin.js').then(m=>m.renderGrowth('reviews')).catch(e=>toast(e.message)),
+    email:()=>import('/growth-admin.js').then(m=>m.renderGrowth('email')).catch(e=>toast(e.message)),
+    launch:()=>RivoOperations.render('launch'),
     overview: overview,
     products: productsView,
     orders: ordersView,
@@ -225,7 +230,7 @@ function productRows() {
   $('product-table').innerHTML = list.length
     ? `<div class="table-wrap"><table><thead><tr><th><input id="select-all-products" type="checkbox" aria-label="تحديد كل المنتجات الظاهرة" ${allSelected ? 'checked' : ''}></th><th>المنتج</th><th>التصنيف</th><th>السعر</th><th>طريقة الطلب</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>${list.map((p) => `<tr><td><input class="product-select" type="checkbox" data-product-id="${p.id}" aria-label="تحديد ${esc(p.name)}" ${selectedProducts.has(p.id) ? 'checked' : ''}></td><td><div class="table-product"><span class="mini-cover">${p.image_url ? `<img src="${esc(p.image_url)}" alt="" loading="lazy" decoding="async">` : esc(p.name.slice(0, 2))}</span><div><b>${esc(p.name)}</b><small>${esc(p.slug)}</small></div></div></td><td>${esc(p.category)}</td><td>${esc(money(p.price_cents, p.currency))}</td><td>${badge(p.payment_mode)}</td><td>${badge(p.status)}</td><td><div class="row-actions"><button onclick="editProduct('${p.id}')">تعديل</button>${p.status !== 'archived' ? `<button onclick="archiveProduct('${p.id}')">أرشفة</button>` : ''}<button class="danger" onclick="deleteProduct('${p.id}')">حذف</button></div></td></tr>`).join('')}</tbody></table></div>`
     : empty('ما في منتجات مطابقة', 'جرّب تغيير البحث أو أضف منتجك الأول.');
-  $('bulk-edit').onclick = () => RivoOperations.bulk();
+  $('bulk-edit').onclick=()=>RivoOperations.bulk();
   $('bulk-publish').onclick = () => bulkProductAction('publish');
   $('bulk-delete').onclick = () => bulkProductAction('delete');
   $('select-all-products')?.addEventListener('change', (e) => {
@@ -627,6 +632,7 @@ function customer(orders) {
   document.title = 'حسابي | ريفو';
   $('app').innerHTML =
     `<header class="customer-header"><div class="wrap topbar">${brand}<nav><a href="/">المتجر</a>${['owner', 'admin', 'support'].includes(user.role) ? '<a href="/admin">لوحة الإدارة</a>' : ''}</nav><a class="store-login" href="/login" data-logout target="_top">تسجيل الخروج ←</a></div></header><main class="customer-wrap"><div class="customer-welcome"><div><h1>أهلًا ${esc(user.name.split(' ')[0])} 👋</h1><p>طلباتك ومشترياتك من ريفو، كلها هون.</p></div><a class="primary" href="/">تصفّح المتجر ←</a></div><div class="stats customer-stats">${stat('طلباتي', orders.length, 'كل الطلبات')}${stat('مشترياتي', paid.length, 'طلبات مدفوعة')}${stat('قيد المتابعة', orders.filter((o) => !['completed', 'cancelled'].includes(o.status)).length, 'طلبات لم تكتمل')}</div><section class="panel"><div class="tabs"><button id="tab-all" class="${orderTab === 'all' ? 'active' : ''}">كل الطلبات</button><button id="tab-purchases" class="${orderTab === 'purchases' ? 'active' : ''}">المشتريات المدفوعة</button></div>${list.length ? list.map((o) => `<div class="order-card"><div class="order-card-top"><code>#${o.id.slice(0, 8)}</code><div>${o.payment_status.startsWith('test_') ? '<span class="badge purple">اختبار مكتمل</span>' : badge(o.status)} ${badge(o.payment_status)}</div></div>${o.items.map((x) => `<div class="order-item"><span>${esc(x.name)} × ${x.quantity}${x.region ? ' · ' + esc(x.region) : ''}</span><b>${esc(money(x.unit_cents * x.quantity, o.currency))}</b></div>`).join('')}<div class="order-meta"><span>${date(o.created_at)}</span><span>${labels[o.payment_method]}</span><strong>الإجمالي ${esc(money(o.total_cents, o.currency))}</strong></div><a class="primary" href="/order.html?order=${encodeURIComponent(o.id)}">تفاصيل الطلب والتسليم ←</a>${o.payment_method === 'gateway' ? '<p><a class="primary" href="/payment.html?order=' + encodeURIComponent(o.id) + '">مراجعة مبلغ وحالة الدفع بالدولار</a></p>' : ''}${o.customer_update ? '<div class="customer-update"><strong>تحديث ريفو</strong><br>' + esc(o.customer_update) + '</div>' : ''}${o.payment_status !== 'paid' && o.payment_method === 'whatsapp' ? '<p class="small-note">فتح محادثة واتساب لا يؤكد الدفع. تظهر عملية الشراء بعد تأكيد الإدارة استلام المبلغ.</p>' : ''}</div>`).join('') : empty(orderTab === 'purchases' ? 'لسه ما عندك مشتريات مدفوعة' : 'لسه ما عندك طلبات', orderTab === 'purchases' ? 'بعد تأكيد الدفع، رح تلاقي المنتجات اللي اشتريتها هون.' : 'ابدأ بتصفّح المتجر واختار المنتج المناسب إلك.', '<a class="primary" href="/">استكشف المنتجات</a>')}</section></main>`;
+  const tools=document.createElement('section');tools.className='panel customer-growth-tools';document.querySelector('.customer-welcome').after(tools);import('/customer-growth-ui.js').then(m=>m.mountAccountTools(tools));
   $('tab-all').onclick = () => {
     orderTab = 'all';
     customer(orders);

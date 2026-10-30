@@ -1,142 +1,18 @@
 (() => {
-  const esc = (v) =>
-    String(v ?? '').replace(
-      /[&<>"']/g,
-      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
-    );
-  let page = 1,
-    total = 0,
-    inFlight = false,
-    enabled = false,
-    timer,
-    button,
-    dialog;
-  async function request(path, body) {
-    const r = await fetch(path, {
-      cache: 'no-store',
-      ...(body
-        ? {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          }
-        : {}),
-    });
-    if (r.status === 401) {
-      enabled = false;
-      button?.remove();
-      dialog?.remove();
-      clearTimeout(timer);
-      throw Error('سجّل الدخول أولًا');
-    }
-    const d = await r.json();
-    if (!r.ok) throw Error(d.error || 'تعذّر تحميل التنبيهات');
-    return d;
-  }
-  async function load() {
-    if (!enabled || inFlight || document.hidden) return;
-    inFlight = true;
-    try {
-      const d = await request('/api/notifications?page=' + page);
-      total = d.total;
-      button.textContent =
-        'تنبيهات الطلبات' + (d.unread ? ' · ' + (d.unread > 99 ? '99+' : d.unread) : '');
-      button.setAttribute('aria-label', 'تنبيهات الطلبات، ' + d.unread + ' غير مقروء');
-      if (dialog.open) {
-        dialog.querySelector('[data-list]').innerHTML = d.items.length
-          ? d.items
-              .map(
-                (n) =>
-                  '<article class="rivo-notification ' +
-                  (n.read_at ? '' : 'is-unread') +
-                  '"><a href="/order.html?order=' +
-                  encodeURIComponent(n.order_id) +
-                  '" data-id="' +
-                  esc(n.id) +
-                  '"><b>' +
-                  esc(n.title) +
-                  '</b><p>' +
-                  esc(n.body) +
-                  '</p><small>' +
-                  esc(new Date(n.created_at).toLocaleString('ar-PS')) +
-                  ' · #' +
-                  esc(n.order_id.slice(0, 8)) +
-                  '</small></a></article>',
-              )
-              .join('')
-          : '<p class="helper">لا توجد تنبيهات طلبات بعد.</p>';
-        dialog.querySelector('[data-page-label]').textContent = 'صفحة ' + page;
-        dialog.querySelector('[data-prev]').disabled = page === 1;
-        dialog.querySelector('[data-next]').disabled = page * 25 >= total;
-        dialog.querySelectorAll('[data-id]').forEach(
-          (a) =>
-            (a.onclick = async (e) => {
-              e.preventDefault();
-              try {
-                await request('/api/notifications/read', { id: a.dataset.id });
-              } catch {}
-              location.assign(a.getAttribute('href'));
-            }),
-        );
-      }
-    } catch (e) {
-      if (dialog?.open) dialog.querySelector('[data-list]').textContent = e.message;
-    } finally {
-      inFlight = false;
-    }
-  }
-  async function tick() {
-    await load();
-    if (enabled) timer = setTimeout(tick, 30000);
-  }
-  async function start() {
-    try {
-      const r = await fetch('/api/session', { cache: 'no-store' });
-      if (!r.ok || !(await r.json()).user) return;
-    } catch {
-      return;
-    }
-    enabled = true;
-    button = document.createElement('button');
-    button.className = 'rivo-order-bell';
-    button.type = 'button';
-    button.textContent = 'تنبيهات الطلبات';
-    document.body.append(button);
-    dialog = document.createElement('dialog');
-    dialog.className = 'rivo-notification-dialog';
-    dialog.setAttribute('aria-label', 'تنبيهات الطلبات');
-    dialog.innerHTML =
-      '<div class="panel-head"><h2>تنبيهات طلباتك</h2><button class="secondary" data-close type="button" aria-label="إغلاق التنبيهات">×</button></div><p class="helper">تُحدّث أثناء فتح الموقع؛ هذه تنبيهات داخلية وليست بريدًا أو إشعارات جوال.</p><button class="text-btn" data-read>تعليم الكل كمقروء</button><div data-list aria-live="polite"></div><div class="rivo-notification-pages"><button class="secondary" data-prev>السابق</button><span data-page-label></span><button class="secondary" data-next>التالي</button></div>';
-    document.body.append(dialog);
-    button.onclick = () => {
-      page = 1;
-      dialog.showModal();
-      load();
-    };
-    dialog.querySelector('[data-close]').onclick = () => dialog.close();
-    dialog.querySelector('[data-prev]').onclick = () => {
-      page--;
-      load();
-    };
-    dialog.querySelector('[data-next]').onclick = () => {
-      page++;
-      load();
-    };
-    dialog.querySelector('[data-read]').onclick = async () => {
-      try {
-        await request('/api/notifications/read', { all: true });
-        await load();
-      } catch (e) {
-        dialog.querySelector('[data-list]').textContent = e.message;
-      }
-    };
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) load();
-    });
-    window.addEventListener('pagehide', () => clearTimeout(timer));
-    tick();
-  }
-  if (document.readyState === 'loading')
-    document.addEventListener('DOMContentLoaded', start, { once: true });
-  else start();
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ let page=1,total=0,inFlight=false,enabled=false,timer,button,dialog;
+ async function request(path,body){const r=await fetch(path,{cache:'no-store',...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})});if(r.status===401){enabled=false;button?.remove();dialog?.remove();clearTimeout(timer);throw Error('سجّل الدخول أولًا');}const d=await r.json();if(!r.ok)throw Error(d.error||'تعذّر تحميل التنبيهات');return d;}
+ async function load(){if(!enabled||inFlight||document.hidden)return;inFlight=true;try{
+  const d=await request('/api/notifications?page='+page);total=d.total;button.textContent='تنبيهات الطلبات'+(d.unread?' · '+(d.unread>99?'99+':d.unread):'');button.setAttribute('aria-label','تنبيهات الطلبات، '+d.unread+' غير مقروء');
+  if(dialog.open){dialog.querySelector('[data-list]').innerHTML=d.items.length?d.items.map(n=>'<article class="rivo-notification '+(n.read_at?'':'is-unread')+'"><a href="/order.html?order='+encodeURIComponent(n.order_id)+'" data-id="'+esc(n.id)+'"><b>'+esc(n.title)+'</b><p>'+esc(n.body)+'</p><small>'+esc(new Date(n.created_at).toLocaleString('ar-PS'))+' · #'+esc(n.order_id.slice(0,8))+'</small></a></article>').join(''):'<p class="helper">لا توجد تنبيهات طلبات بعد.</p>';dialog.querySelector('[data-page-label]').textContent='صفحة '+page;dialog.querySelector('[data-prev]').disabled=page===1;dialog.querySelector('[data-next]').disabled=page*25>=total;
+   dialog.querySelectorAll('[data-id]').forEach(a=>a.onclick=async e=>{e.preventDefault();try{await request('/api/notifications/read',{id:a.dataset.id});}catch{}location.assign(a.getAttribute('href'));});}
+ }catch(e){if(dialog?.open)dialog.querySelector('[data-list]').textContent=e.message;}finally{inFlight=false;}}
+ async function tick(){await load();if(enabled)timer=setTimeout(tick,30000);}
+ async function start(){try{const r=await fetch('/api/session',{cache:'no-store'});if(!r.ok||!(await r.json()).user)return;}catch{return;}
+  enabled=true;button=document.createElement('button');button.className='rivo-order-bell';button.type='button';button.textContent='تنبيهات الطلبات';document.body.append(button);
+  dialog=document.createElement('dialog');dialog.className='rivo-notification-dialog';dialog.setAttribute('aria-label','تنبيهات الطلبات');dialog.innerHTML='<div class="panel-head"><h2>تنبيهات طلباتك</h2><button class="secondary" data-close type="button" aria-label="إغلاق التنبيهات">×</button></div><p class="helper">تُحدّث أثناء فتح الموقع؛ هذه تنبيهات داخلية وليست بريدًا أو إشعارات جوال.</p><button class="text-btn" data-read>تعليم الكل كمقروء</button><div data-list aria-live="polite"></div><div class="rivo-notification-pages"><button class="secondary" data-prev>السابق</button><span data-page-label></span><button class="secondary" data-next>التالي</button></div>';document.body.append(dialog);
+  button.onclick=()=>{page=1;dialog.showModal();load();};dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.querySelector('[data-prev]').onclick=()=>{page--;load();};dialog.querySelector('[data-next]').onclick=()=>{page++;load();};dialog.querySelector('[data-read]').onclick=async()=>{try{await request('/api/notifications/read',{all:true});await load();}catch(e){dialog.querySelector('[data-list]').textContent=e.message;}};
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});window.addEventListener('pagehide',()=>clearTimeout(timer));tick();
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();

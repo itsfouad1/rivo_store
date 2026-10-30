@@ -1,113 +1,23 @@
 /* Staff-only catalog presentation controls; do not change prices or supplier mappings. */
-window.RivoCollections = (() => {
-  const escape = (v) =>
-    String(v ?? '').replace(
-      /[&<>"']/g,
-      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
-    );
-  let saved = { version: 0, groups: [] },
-    editing = null;
-  const request = async (method, body) => {
-    const r = await fetch('/api/admin/collections', {
-      method,
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    const d = await r.json();
-    if (!r.ok) throw Error(d.error || 'تعذّر الحفظ');
-    return d;
-  };
+window.RivoCollections = (()=>{
+  const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let saved={version:0,groups:[]}, editing=null;
+  const request=async(method,body)=>{const r=await fetch('/api/admin/collections',{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw Error(d.error||'تعذّر الحفظ');return d;};
   async function render() {
-    const root = document.getElementById('dash-view');
-    root.innerHTML = '<div class="panel"><p>جاري تحميل تنظيم المنتجات…</p></div>';
-    try {
-      saved = await request('GET');
-      if (document.getElementById('dash-view') !== root || location.hash.slice(1) !== 'collections')
-        return;
-      editing = null;
-      draw(root);
-    } catch (e) {
-      root.innerHTML = '<div class="panel">' + escape(e.message) + '</div>';
-    }
+    const root=document.getElementById('dash-view');
+    root.innerHTML='<div class="panel"><p>جاري تحميل تنظيم المنتجات…</p></div>';
+    try{saved=await request('GET');if(document.getElementById('dash-view')!==root||location.hash.slice(1)!=='collections')return;editing=null;draw(root)}catch(e){root.innerHTML='<div class="panel">'+escape(e.message)+'</div>'}
   }
   function draw(root) {
-    const products = data.products,
-      group = saved.groups.find((g) => g.id === editing);
-    const used = new Set(
-      saved.groups.filter((g) => g.id !== editing).flatMap((g) => g.product_ids),
-    );
-    root.innerHTML = `<div class="page-head"><div><h2>تنظيم المنتجات</h2><p>مجموعة واحدة للعبة أو المنصة، وفئات متعددة بداخلها. لا تتغير الأسعار أو إعدادات المورد.</p></div><button class="primary" id="new-collection">+ مجموعة جديدة</button></div><div class="info-box">الأسماء المعروفة تتجمع تلقائيًا حسب المنصة ونوع الخدمة. هنا بتقدر تتجاوز التجميع التلقائي وتحدد الاسم والنوع والمنتجات بنفسك. حذف المجموعة يرجع منتجاتها للتجميع التلقائي ولا يحذف المنتجات.</div><div class="collection-admin-layout"><section class="panel"><h3>المجموعات اليدوية (${saved.groups.length})</h3>${saved.groups.map((g) => `<div class="collection-admin-row"><div><strong>${escape(g.title)}</strong><p class="helper">${escape(g.id)} · ${g.product_ids.length} فئة</p></div><button class="secondary" data-edit-group="${escape(g.id)}">تعديل</button><a class="link-btn" href="/product.html?group=${encodeURIComponent('custom:' + g.id)}" target="_blank" rel="noopener">معاينة ↗</a></div>`).join('') || '<p class="helper">لا توجد مجموعات يدوية. المتجر يستخدم التجميع التلقائي.</p>'}</section><section class="panel"><h3>${group ? 'تعديل المجموعة' : 'مجموعة جديدة'}</h3><form id="collection-form"><div class="form-grid"><label class="field">اسم العرض<input name="title" maxlength="100" required value="${escape(group?.title || '')}" placeholder="مثال: PUBG Mobile"></label><label class="field">معرّف ثابت للرابط<input name="id" maxlength="80" pattern="[a-z0-9][a-z0-9-]{0,79}" required value="${escape(group?.id || '')}" ${group ? 'readonly' : ''} placeholder="pubg-mobile"><small>أحرف إنجليزية صغيرة وأرقام وشرطات.</small></label><label class="field full">القسم<select name="kind">${Object.entries(
-      {
-        topup: 'شحن الألعاب',
-        cards: 'البطاقات الرقمية',
-        subscriptions: 'الاشتراكات',
-        other: 'منتجات أخرى',
-      },
-    )
-      .map(([v, t]) => `<option value="${v}" ${v === group?.kind ? 'selected' : ''}>${t}</option>`)
-      .join(
-        '',
-      )}</select></label></div><label class="field">ابحث بين المنتجات<input id="collection-search" type="search" placeholder="اسم أو منطقة أو معرّف المنتج"></label><p class="helper">اجمع فئات الخدمة نفسها فقط. تجنّب خلط شحن الحساب مع الأكواد؛ المنطقة والتعليمات تبقى مستقلة لكل فئة.</p><fieldset class="collection-product-picker"><legend>الفئات التابعة للمجموعة</legend>${products
-      .filter((p) => !used.has(p.id))
-      .map(
-        (p) =>
-          `<label class="collection-product-choice" data-search="${escape((p.name + ' ' + p.region + ' ' + p.id).toLowerCase())}"><input type="checkbox" name="product_ids" value="${escape(p.id)}" ${group?.product_ids.includes(p.id) ? 'checked' : ''}><span><strong>${escape(p.name)}</strong><small>${escape(p.region || 'غير محددة')} · ${escape(p.status)} · ${escape(p.id)}</small></span></label>`,
-      )
-      .join(
-        '',
-      )}</fieldset><p class="helper">المنتجات المنضمة لمجموعة يدوية أخرى لا تظهر هنا. المسودات لا تظهر للزبون حتى تنشرها.</p><p id="collection-error" class="form-error" role="alert"></p><div class="form-actions"><button class="primary" type="submit">حفظ المجموعة</button>${group ? '<button class="danger" id="delete-collection" type="button">إلغاء التجميع اليدوي</button>' : ''}</div></form></section></div>`;
-    root.querySelector('#new-collection').onclick = () => {
-      editing = null;
-      draw(root);
-    };
-    root.querySelectorAll('[data-edit-group]').forEach(
-      (b) =>
-        (b.onclick = () => {
-          editing = b.dataset.editGroup;
-          draw(root);
-        }),
-    );
-    root.querySelector('#collection-search').oninput = (e) =>
-      root
-        .querySelectorAll('[data-search]')
-        .forEach(
-          (el) => (el.hidden = !el.dataset.search.includes(e.target.value.toLowerCase().trim())),
-        );
-    const save = async (groups, button) => {
-      button.disabled = true;
-      try {
-        saved = await request('PUT', { version: saved.version, groups });
-        editing = null;
-        draw(root);
-        toast('تم حفظ تنظيم المنتجات');
-      } catch (e) {
-        root.querySelector('#collection-error').textContent = e.message;
-        button.disabled = false;
-      }
-    };
-    root.querySelector('#collection-form').onsubmit = (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target),
-        ids = fd.getAll('product_ids');
-      if (!ids.length) {
-        root.querySelector('#collection-error').textContent = 'اختار فئة واحدة على الأقل';
-        return;
-      }
-      const next = {
-        id: fd.get('id').trim(),
-        title: fd.get('title').trim(),
-        kind: fd.get('kind'),
-        product_ids: ids,
-      };
-      save([...saved.groups.filter((g) => g.id !== editing), next], e.submitter);
-    };
-    root.querySelector('#delete-collection')?.addEventListener('click', (e) => {
-      if (confirm('إلغاء المجموعة اليدوية؟ المنتجات ستبقى وترجع للتجميع التلقائي.'))
-        save(
-          saved.groups.filter((g) => g.id !== editing),
-          e.currentTarget,
-        );
-    });
+    const products=data.products, group=saved.groups.find(g=>g.id===editing);
+    const used=new Set(saved.groups.filter(g=>g.id!==editing).flatMap(g=>g.product_ids));
+    root.innerHTML=`<div class="page-head"><div><h2>تنظيم المنتجات</h2><p>مجموعة واحدة للعبة أو المنصة، وفئات متعددة بداخلها. لا تتغير الأسعار أو إعدادات المورد.</p></div><button class="primary" id="new-collection">+ مجموعة جديدة</button></div><div class="info-box">الأسماء المعروفة تتجمع تلقائيًا حسب المنصة ونوع الخدمة. هنا بتقدر تتجاوز التجميع التلقائي وتحدد الاسم والنوع والمنتجات بنفسك. حذف المجموعة يرجع منتجاتها للتجميع التلقائي ولا يحذف المنتجات.</div><div class="collection-admin-layout"><section class="panel"><h3>المجموعات اليدوية (${saved.groups.length})</h3>${saved.groups.map(g=>`<div class="collection-admin-row"><div><strong>${escape(g.title)}</strong><p class="helper">${escape(g.id)} · ${g.product_ids.length} فئة</p></div><button class="secondary" data-edit-group="${escape(g.id)}">تعديل</button><a class="link-btn" href="/product.html?group=${encodeURIComponent('custom:'+g.id)}" target="_blank" rel="noopener">معاينة ↗</a></div>`).join('')||'<p class="helper">لا توجد مجموعات يدوية. المتجر يستخدم التجميع التلقائي.</p>'}</section><section class="panel"><h3>${group?'تعديل المجموعة':'مجموعة جديدة'}</h3><form id="collection-form"><div class="form-grid"><label class="field">اسم العرض<input name="title" maxlength="100" required value="${escape(group?.title||'')}" placeholder="مثال: PUBG Mobile"></label><label class="field">معرّف ثابت للرابط<input name="id" maxlength="80" pattern="[a-z0-9][a-z0-9-]{0,79}" required value="${escape(group?.id||'')}" ${group?'readonly':''} placeholder="pubg-mobile"><small>أحرف إنجليزية صغيرة وأرقام وشرطات.</small></label><label class="field full">القسم<select name="kind">${Object.entries({topup:'شحن الألعاب',cards:'البطاقات الرقمية',subscriptions:'الاشتراكات',other:'منتجات أخرى'}).map(([v,t])=>`<option value="${v}" ${v===group?.kind?'selected':''}>${t}</option>`).join('')}</select></label></div><label class="field">ابحث بين المنتجات<input id="collection-search" type="search" placeholder="اسم أو منطقة أو معرّف المنتج"></label><p class="helper">اجمع فئات الخدمة نفسها فقط. تجنّب خلط شحن الحساب مع الأكواد؛ المنطقة والتعليمات تبقى مستقلة لكل فئة.</p><fieldset class="collection-product-picker"><legend>الفئات التابعة للمجموعة</legend>${products.filter(p=>!used.has(p.id)).map(p=>`<label class="collection-product-choice" data-search="${escape((p.name+' '+p.region+' '+p.id).toLowerCase())}"><input type="checkbox" name="product_ids" value="${escape(p.id)}" ${group?.product_ids.includes(p.id)?'checked':''}><span><strong>${escape(p.name)}</strong><small>${escape(p.region||'غير محددة')} · ${escape(p.status)} · ${escape(p.id)}</small></span></label>`).join('')}</fieldset><p class="helper">المنتجات المنضمة لمجموعة يدوية أخرى لا تظهر هنا. المسودات لا تظهر للزبون حتى تنشرها.</p><p id="collection-error" class="form-error" role="alert"></p><div class="form-actions"><button class="primary" type="submit">حفظ المجموعة</button>${group?'<button class="danger" id="delete-collection" type="button">إلغاء التجميع اليدوي</button>':''}</div></form></section></div>`;
+    root.querySelector('#new-collection').onclick=()=>{editing=null;draw(root)};
+    root.querySelectorAll('[data-edit-group]').forEach(b=>b.onclick=()=>{editing=b.dataset.editGroup;draw(root)});
+    root.querySelector('#collection-search').oninput=e=>root.querySelectorAll('[data-search]').forEach(el=>el.hidden=!el.dataset.search.includes(e.target.value.toLowerCase().trim()));
+    const save=async(groups,button)=>{button.disabled=true;try{saved=await request('PUT',{version:saved.version,groups});editing=null;draw(root);toast('تم حفظ تنظيم المنتجات')}catch(e){root.querySelector('#collection-error').textContent=e.message;button.disabled=false}};
+    root.querySelector('#collection-form').onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target),ids=fd.getAll('product_ids');if(!ids.length){root.querySelector('#collection-error').textContent='اختار فئة واحدة على الأقل';return;}const next={id:fd.get('id').trim(),title:fd.get('title').trim(),kind:fd.get('kind'),product_ids:ids};save([...saved.groups.filter(g=>g.id!==editing),next],e.submitter)};
+    root.querySelector('#delete-collection')?.addEventListener('click',e=>{if(confirm('إلغاء المجموعة اليدوية؟ المنتجات ستبقى وترجع للتجميع التلقائي.'))save(saved.groups.filter(g=>g.id!==editing),e.currentTarget)});
   }
-  return { render };
+  return {render};
 })();

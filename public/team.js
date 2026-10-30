@@ -27,7 +27,7 @@ async function teamView() {
                     ['support', 'دعم فني'],
                     ['admin', 'أدمن'],
                   ],
-                )}<p>الأدمن فقط يستخدم الصلاحيات التالية. الدعم يملك بحث الطلبات وملاحظات الدعم فقط.</p>${r.permissions.map((p) => `<label class="check-field"><input type="checkbox" name="permissions" value="${p}" ${perms.includes(p) ? 'checked' : ''}>${{ products: 'المنتجات', orders_write: 'إدارة الطلبات وتأكيد الدفع اليدوي', settings: 'إعدادات المتجر', suppliers: 'الموردون وتنفيذ الطلبات', policies: 'نشر السياسات', reports: 'تقارير الإيرادات والتكاليف المسجلة' }[p]}</label>`).join('')}<label><input name="active" type="checkbox" ${u.active ? 'checked' : ''}>تفعيل وصول الموظف</label>${formEnd('حفظ الصلاحيات')}</form>`,
+                )}<p>الأدمن فقط يستخدم الصلاحيات التالية. الدعم يملك بحث الطلبات وملاحظات الدعم فقط.</p>${r.permissions.map((p) => `<label class="check-field"><input type="checkbox" name="permissions" value="${p}" ${perms.includes(p) ? 'checked' : ''}>${{ products: 'المنتجات', orders_write: 'إدارة الطلبات وتأكيد الدفع اليدوي', settings: 'إعدادات المتجر', suppliers: 'الموردون وتنفيذ الطلبات', policies: 'نشر السياسات', reports:'تقارير الإيرادات والتكاليف المسجلة' }[p]}</label>`).join('')}<label><input name="active" type="checkbox" ${u.active ? 'checked' : ''}>تفعيل وصول الموظف</label>${formEnd('حفظ الصلاحيات')}</form>`,
               );
               bindForm('team-form', async (fd) => {
                 await send('/api/admin/team/' + encodeURIComponent(u.id), 'PUT', {

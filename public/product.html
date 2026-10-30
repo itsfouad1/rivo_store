@@ -17,15 +17,14 @@
     />
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/dashboard.css" />
+    <link rel="stylesheet" href="/customer-growth.css" />
     <link rel="stylesheet" href="/catalog.css" />
     <link rel="stylesheet" href="/product-groups.css" />
     <link rel="stylesheet" href="/policies.css" />
     <link rel="icon" href="/assets/logo.png" />
     <link rel="stylesheet" href="/chat.css" />
     <link rel="stylesheet" href="/purchase.css" />
-    <link rel="stylesheet" href="/notifications.css" />
-    <link rel="stylesheet" href="/operations.css" />
-  </head>
+  <link rel="stylesheet" href="/notifications.css"><link rel="stylesheet" href="/operations.css"></head>
   <body class="storefront product-detail-page" data-catalog="product">
     <header>
       <div class="wrap topbar">
@@ -44,14 +43,8 @@
       </div>
     </header>
     <main>
-      <div class="wrap detail-market">
-        <label class="market-select"
-          >الدولة وعملة العرض<select id="market" aria-label="اختر الدولة وعملة العرض"></select
-        ></label>
-      </div>
-      <div class="wrap product-page" id="product-page">
-        <div class="catalog-loading" role="status">جاري تحميل الفئات…</div>
-      </div>
+      <div class="wrap detail-market"><label class="market-select">الدولة وعملة العرض<select id="market" aria-label="اختر الدولة وعملة العرض"></select></label></div>
+      <div class="wrap product-page" id="product-page"><div class="catalog-loading" role="status">جاري تحميل الفئات…</div></div>
     </main>
     <footer>
       <div class="wrap footer-main">
@@ -93,6 +86,5 @@
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script type="module" src="/app.js"></script>
     <script src="/chat.js"></script>
-    <script src="/notifications.js"></script>
-  </body>
+  <script src="/notifications.js"></script></body>
 </html>

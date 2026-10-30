@@ -17,15 +17,14 @@
     />
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/dashboard.css" />
+    <link rel="stylesheet" href="/customer-growth.css" />
     <link rel="stylesheet" href="/catalog.css" />
     <link rel="stylesheet" href="/product-groups.css" />
     <link rel="stylesheet" href="/policies.css" />
     <link rel="icon" href="/assets/logo.png" />
     <link rel="stylesheet" href="/chat.css" />
     <link rel="stylesheet" href="/purchase.css" />
-    <link rel="stylesheet" href="/notifications.css" />
-    <link rel="stylesheet" href="/operations.css" />
-  </head>
+  <link rel="stylesheet" href="/notifications.css"><link rel="stylesheet" href="/operations.css"></head>
   <body class="storefront products-page" data-catalog="full">
     <header>
       <div class="wrap topbar">
@@ -44,26 +43,13 @@
       </div>
     </header>
     <main>
-      <section class="shop-banner">
-        <div class="wrap shop-banner-inner">
-          <div>
-            <a class="shop-breadcrumb" href="/">الرئيسية</a
-            ><span class="shop-breadcrumb"> / المنتجات</span>
-            <p class="kicker">عالمك الرقمي، على كيفك</p>
-            <h1>جاهز لجولتك الجاية؟</h1>
-            <p>كل الألعاب والبطاقات في مكان واحد. اختار، راجع التفاصيل، وكمّل طلبك.</p>
-          </div>
-          <div class="shop-emblem" aria-hidden="true">
-            <span>R</span><small>PLAY YOUR WAY</small>
-          </div>
-        </div>
-      </section>
+      <section class="shop-banner"><div class="wrap shop-banner-inner"><div><a class="shop-breadcrumb" href="/">الرئيسية</a><span class="shop-breadcrumb"> / المنتجات</span><p class="kicker">عالمك الرقمي، على كيفك</p><h1>جاهز لجولتك الجاية؟</h1><p>كل الألعاب والبطاقات في مكان واحد. اختار، راجع التفاصيل، وكمّل طلبك.</p></div><div class="shop-emblem" aria-hidden="true"><span>R</span><small>PLAY YOUR WAY</small></div></div></section>
       <div class="wrap">
         <section id="catalog" class="catalog">
           <div class="section-heading">
             <div>
               <span class="kicker">اختار عالمك</span>
-              <h2>اكتشف المنتجات</h2>
+              <h2>اكتشف المنتجات</h2><a class="browse-all" href="/products.html?favorites=1">♡ مفضلتي</a>
             </div>
             <label class="search"
               ><svg viewBox="0 0 24 24">
@@ -76,13 +62,7 @@
                 aria-label="ابحث عن لعبة أو بطاقة"
             /></label>
           </div>
-          <div class="product-types" role="group" aria-label="نوع المنتج">
-            <button data-kind="" class="active" aria-pressed="true">كل العوالم</button
-            ><button data-kind="topup" aria-pressed="false">شحن الألعاب</button
-            ><button data-kind="cards" aria-pressed="false">البطاقات الرقمية</button
-            ><button data-kind="subscriptions" aria-pressed="false">الاشتراكات</button
-            ><button data-kind="other" aria-pressed="false">منتجات أخرى</button>
-          </div>
+          <div class="product-types" role="group" aria-label="نوع المنتج"><button data-kind="" class="active" aria-pressed="true">كل العوالم</button><button data-kind="topup" aria-pressed="false">شحن الألعاب</button><button data-kind="cards" aria-pressed="false">البطاقات الرقمية</button><button data-kind="subscriptions" aria-pressed="false">الاشتراكات</button><button data-kind="other" aria-pressed="false">منتجات أخرى</button></div>
           <div class="catalog-toolbar">
             <div id="filters" class="filters" role="group" aria-label="تصنيف المنتجات"></div>
             <div class="catalog-controls">
@@ -131,9 +111,7 @@
           <p class="catalog-help">
             منطقة التفعيل تخص حساب اللعبة أو المنصة، وهي مستقلة عن الدولة وعملة العرض.
           </p>
-          <div id="grid" class="grid" aria-busy="true">
-            <p class="catalog-loading">عم نجهّز المنتجات…</p>
-          </div>
+          <div id="grid" class="grid" aria-busy="true"><p class="catalog-loading">عم نجهّز المنتجات…</p></div>
           <nav id="catalog-pages" class="catalog-pages" aria-label="صفحات المنتجات"></nav>
           <div id="empty" class="empty" hidden>
             <h3>ما لقينا منتجات</h3>
@@ -187,6 +165,5 @@
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script type="module" src="/app.js"></script>
     <script src="/chat.js"></script>
-    <script src="/notifications.js"></script>
-  </body>
+  <script src="/notifications.js"></script></body>
 </html>
